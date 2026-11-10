@@ -355,7 +355,7 @@ const SKILLS = {
   swim:{name:'Swimmer',desc:'Crosses water without Sailing'},
   pathfinder:{name:'Pathfinder',desc:'Forests and mountains don’t stop it'},
 };
-const LOOKS = {wizard:'Wizard', sword:'Swordsman', bow:'Archer', horse:'Rider', shield:'Shield-bearer', staff:'Mystic', hammer:'Brute'};
+const LOOKS = {wizard:'Wizard', warlock:'Warlock', elf:'Elf', pale:'Pale One', sword:'Swordsman', bow:'Archer', horse:'Rider', shield:'Shield-bearer', staff:'Mystic', hammer:'Brute'};
 const LOOK_BY_ID = {scout:'sword', archer:'bow', rider:'horse', guard:'shield', mender:'staff', brute:'hammer'};
 const HARV = {
   fruit:{tech:'foraging',cost:2,pop:1,label:'Gather fruit'},
@@ -1573,8 +1573,91 @@ function wizard(cx, by, col, t, seed){
   poly([cx,hy-21.4, cx+1.6,hy-25, cx+3.6,hy-25.6, cx+1.4,hy-21], col);
   star5(cx+3.6, hy-26.6, 2.6, shade(col,1.3));
 }
+// Warlock: dark armor, spiked crown helm, ember eyes, cape, staff with a caged ember
+function warlock(cx, by, col, t, seed){
+  const A1 = '#86808c', A2 = '#68626f', A3 = '#4b4652', GOLD = '#c8962e', br = REDUCED ? 0 : Math.sin(t/300 + seed)*.7;
+  const glow = REDUCED ? .75 : .6 + Math.sin(t/260 + seed)*.25;
+  const ty = by - 4 + br, hy = ty - 11;
+  poly([cx-6.5,ty-10, cx+6.5,ty-10, cx+9,by+1, cx-9,by-1], '#2f2c35');
+  cube(cx-2.9,by,2.4,5,A1,A2,A3); cube(cx+2.9,by+1.3,2.4,5,A1,A2,A3);
+  poly([cx-4.2,by-4.4, cx-2.6,by-5.2, cx-1.6,by-4, cx-2.6,by-2.6, cx-4.2,by-2.8], null, GOLD, .9);
+  cube(cx, ty, 6, 10.5, A1, A2, A3);
+  poly([cx-6,ty-1.6, cx,ty+1.4, cx,ty+2.6, cx-6,ty-.4], GOLD); poly([cx,ty+1.4, cx+6,ty-1.6, cx+6,ty-.4, cx,ty+2.6], shade(GOLD,.75));
+  poly([cx-4.6,ty-.6, cx-1.4,ty+1, cx-2.4,ty+6, cx-4.2,ty+4.6], '#3f4a3a');
+  line(cx-3.2, ty-9.4, cx-3.2, ty-2.4, A3, .8);
+  line(cx-10, by+3, cx-10, ty-21, '#4a3b33', 2); poly([cx-11,ty-12, cx-9,ty-12, cx-9,ty-10.6, cx-11,ty-10.6], GOLD);
+  circle(cx-10, ty-25.5, 7.5, rgba(col, glow*.3));
+  poly([cx-12.6,ty-21, cx-13.4,ty-26, cx-12,ty-31, cx-10,ty-29, cx-8,ty-31, cx-6.6,ty-26, cx-7.4,ty-21], A3);
+  poly([cx-11.2,ty-22, cx-11.6,ty-26, cx-10,ty-29.4, cx-8.4,ty-26, cx-8.8,ty-22], shade(col,1.25)); poly([cx-10,ty-29.4, cx-8.4,ty-26, cx-10,ty-23.6], '#ffd9a0');
+  cube(cx-7.8, ty-3.6, 2, 6, A1, A2, A3); cube(cx-9.6, ty-1.4, 1.8, 2.6, SKIN[0], SKIN[1], SKIN[2]);
+  cube(cx+7.6, ty-6, 2, 6, A1, A2, A3); cube(cx+8.8, ty-11.4, 1.8, 2.8, SKIN[0], SKIN[1], SKIN[2]);
+  for (let i=0;i<4;i++){ const ph = t/380 + seed + i*1.7, fy = REDUCED ? 0 : Math.sin(ph)*1.5; const cc = i%2 ? '#ff9a3c' : shade(col,1.1);
+    circle(cx+9.5+i*1.4, ty-16-i*2.4+fy, 2.2, rgba(col,.2)); cube(cx+9.5+i*1.4, ty-15.4-i*2.4+fy, .9, 1.6, shade(cc,1.15), cc, shade(cc,.7)); }
+  cube(cx-6.6, ty-7.6, 2.9, 3.6, A1, A2, A3); line(cx-9.5, ty-6.2, cx-6.6, ty-4.8, GOLD, .9);
+  cube(cx+6.6, ty-7.6, 2.9, 3.6, A1, A2, A3); line(cx+6.6, ty-4.8, cx+9.5, ty-6.2, shade(GOLD,.75), .9);
+  cube(cx, hy, 4.8, 8.6, A1, A2, A3);
+  poly([cx-4.8,hy-5.6, cx,hy-3.2, cx,hy-1.8, cx-4.8,hy-4.2], '#1d1a22');
+  ctx.fillStyle = shade(col,1.3); ctx.fillRect(cx-3.9, hy-5.1+.5, 1.6, 1.1); ctx.fillRect(cx-1.9, hy-5.1+1.5, 1.6, 1.1);
+  circle(cx-2.4, hy-4, 3.4, rgba(col, glow*.22));
+  line(cx-2.4, hy-1.6, cx-2.4, hy+1.6, A3, .8);
+  for (const [sx, sh, c] of [[-4.2, 9, A1], [-1.4, 12, A1], [1.6, 10, A2], [4.4, 8.5, A2]]){
+    const bx = cx + sx, b0 = hy - 8.6 + Math.abs(sx)*.25; poly([bx-1.3, b0, bx, b0 - sh, bx+1.3, b0], c);
+  }
+}
+// Elf: hooded cloak, long auburn hair, pointed ears, bow and quiver
+function elf(cx, by, col, t, seed){
+  const lt = shade(col,1.18), dk = shade(col,.66), br = REDUCED ? 0 : Math.sin(t/280 + seed)*.7;
+  const HAIR = '#b5653a', HAIRD = '#8e4a28', BROWN = '#6b4a2e';
+  const ty = by - 4 + br, hy = ty - 9.5;
+  poly([cx-5.8,ty-9, cx+5.8,ty-9, cx+8,by, cx-8,by-2], dk);
+  cube(cx+5.2, ty-4, 1.6, 9, '#a07a36', '#86642a', '#64491d');
+  for (let i=0;i<3;i++){ const ax = cx+4.2+i*1.3; line(ax, ty-12, ax+.6, ty-17, '#8a5a32', .9); poly([ax-.2,ty-17, ax+1.6,ty-18, ax+1.2,ty-15.6], i%2 ? '#f2f2f2' : '#7dc25c'); }
+  cube(cx-2.6,by,2.2,4,'#7a5032','#5f3e26','#47301d'); cube(cx+2.6,by+1.3,2.2,4,'#7a5032','#5f3e26','#47301d');
+  cube(cx, ty, 5.4, 9.5, lt, col, dk);
+  poly([cx-5.4,ty-1.8, cx,ty+.9, cx,ty+2, cx-5.4,ty-.7], BROWN); ctx.fillStyle = '#e8c04a'; ctx.fillRect(cx-3, ty-.4, 1.6, 1.4);
+  for (const [lx, ly] of [[-4,-6.6], [-2.2,-5.6], [-4,-4.2]]) poly([cx+lx, ty+ly, cx+lx+1.4, ty+ly-.7, cx+lx+.8, ty+ly+.8], '#d8b44a');
+  cube(cx+7.2, ty-5.6, 1.8, 6, lt, shade(col,.85), dk); cube(cx+8.2, ty-10.6, 1.7, 2.6, SKIN[0], SKIN[1], SKIN[2]);
+  cube(cx-6.8, ty+.2, 1.8, 6.5, lt, col, dk); cube(cx-7.6, ty+2.6, 1.7, 2.4, SKIN[0], SKIN[1], SKIN[2]);
+  ctx.strokeStyle = '#a0672f'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(cx-6.8, ty+12.5, 11, Math.PI*1.18, Math.PI*1.82); ctx.stroke();
+  const a1 = Math.PI*1.18, a2 = Math.PI*1.82; line(cx-6.8+Math.cos(a1)*11, ty+12.5+Math.sin(a1)*11, cx-6.8+Math.cos(a2)*11, ty+12.5+Math.sin(a2)*11, 'rgba(240,240,240,.7)', .6);
+  poly([cx+4.6,hy-6.6, cx+8.4,hy-9.6, cx+5.4,hy-4.4], '#e8b494');
+  cube(cx, hy, 4.6, 8, SKIN[0], SKIN[1], SKIN[2]);
+  poly([cx-4.6,hy-6.4, cx-8.6,hy-9.2, cx-4.6,hy-3.8], '#f0c39b'); poly([cx-4.6,hy-5.6, cx-7.4,hy-7.8, cx-4.6,hy-4.4], '#e3a37e');
+  cube(cx, hy-7.2, 5, 1.6, HAIR, HAIR, HAIRD);
+  poly([cx-4.6,hy-8, cx-3.4,hy-7.4, cx-3.4,hy+4, cx-4.6,hy+3.4], HAIR);
+  poly([cx+3.4,hy-7.4, cx+4.6,hy-8, cx+4.6,hy+5, cx+3.4,hy+5.6], HAIRD);
+  const eye = (x, y) => { ctx.fillStyle = '#3a2a22'; ctx.fillRect(x-.6, y-1, 1.2, 1.9); };
+  eye(cx-2.8, hy-4.2+.9); eye(cx-1, hy-4.2+1.8);
+  ctx.fillStyle = HAIRD; ctx.fillRect(cx-3.5, hy-5.8+.9, 1.6, .7); ctx.fillRect(cx-1.7, hy-5.8+1.8, 1.6, .7);
+  box(cx, hy-8.6, 5.4, .1, lt, col, lt, col, 3.4);
+}
+// Pale Ones: hunched blind cave-dwellers with long claws and a rag tied over their eyes
+function paleOne(cx, by, col, t, seed){
+  const S1 = '#eee5e6', S2 = '#d2c6c9', S3 = '#aea2a6', CL = '#3a2c2a';
+  const br = REDUCED ? 0 : Math.sin(t/240 + seed)*.9;
+  const claws = (x, y) => { for (let i=0;i<3;i++) poly([x-1.6+i*1.4, y, x-1.1+i*1.4, y+2.4, x-.6+i*1.4, y], CL); };
+  cube(cx+5.5, by+1, 2.4, 6, S1, S2, S3); claws(cx+5.5, by+2.2);
+  cube(cx+.5, by+2.6, 2.4, 6, S1, S2, S3); claws(cx+.5, by+3.8);
+  cube(cx+2.6, by-5.5+br, 6.2, 6.5, S1, S2, S3);
+  for (const [hx, hh] of [[0,2.2],[3,3],[6,2.2]]) cube(cx+hx, by-12.4+br+hx*.25, 1.3, hh, S1, S2, S3);
+  poly([cx-3.6,by-6.6+br, cx+2.6,by-3.2+br, cx+2.6,by+.4+br, cx-1.4,by-1+br, cx-3.6,by-3+br], '#5a4a36');
+  poly([cx-2.6,by-4.6+br, cx+.6,by-3+br, cx+.2,by-1.8+br, cx-2.8,by-3.4+br], '#d9cfa8');
+  cube(cx-9.6, by+1.6, 1.7, 9, S1, S2, S3); claws(cx-9.6, by+2.6);
+  cube(cx-4.6, by+3.2, 1.7, 8, S1, S2, S3); claws(cx-4.6, by+4.2);
+  const hx = cx-6.8, hy = by-9 + br*1.3;
+  poly([hx+1.6,hy-5.6, hx+8.6,hy-9.6, hx+3.4,hy-3.2], S2);
+  cube(hx, hy, 4.4, 6.6, S1, S1, S2);
+  poly([hx-4.4,hy-5.4, hx-8.4,hy-8.6, hx-4.4,hy-2.8], S1); poly([hx-4.4,hy-4.8, hx-7,hy-6.8, hx-4.4,hy-3.6], '#e8bcbc');
+  poly([hx-4.4,hy-5.2, hx,hy-2.9, hx,hy-1.5, hx-4.4,hy-3.8], col); poly([hx,hy-2.9, hx+4.4,hy-5.2, hx+4.4,hy-3.8, hx,hy-1.5], shade(col,.72));
+  poly([hx+4.4,hy-4.6, hx+6.4,hy-2.4, hx+5.6,hy-1.4, hx+4.4,hy-3.4], shade(col,.6));
+  ctx.fillStyle = '#5a3a3a'; ctx.fillRect(hx-3.2, hy-.6, 2.2, .7);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(hx-2.8, hy-.2, .5, .7); ctx.fillRect(hx-1.8, hy+.3, .5, .7);
+}
 function figure(cx, by, col, look, t, seed){
   if (look==='wizard') return wizard(cx, by, col, t, seed);
+  if (look==='warlock') return warlock(cx, by, col, t, seed);
+  if (look==='elf') return elf(cx, by, col, t, seed);
+  if (look==='pale') return paleOne(cx, by, col, t, seed);
   const lt = shade(col,1.15), dk = shade(col,.66), md = shade(col,.85);
   const br = REDUCED ? 0 : Math.sin(t/280 + seed)*.8;
   let base = by;
@@ -1865,9 +1948,9 @@ cv.addEventListener('wheel', e => {
 /* ---------- title, tribe and setup screens ---------- */
 const TRIBES = () => [
   {name:'Wizards', color:'#5458c9', tech:'herbalism', look:'wizard', style:'wizard', img:'wizards.jpg', art:'wizards-wide.jpg', desc:'Spell-casters of the star towers. They start the game knowing Herbalism.'},
-  {name:'Tidecallers', color:'#4fb3e8', tech:'fishing', look:'bow', desc:'Sailors of the shallow seas. They start the game knowing Fishing.'},
-  {name:'Moss Wardens', color:'#a3d955', tech:'hunting', look:'staff', desc:'Keepers of the deep woods. They start the game knowing Hunting.'},
-  {name:'Ashfolk', color:'#c58cf0', tech:'climbing', look:'hammer', desc:'Smiths of the high peaks. They start the game knowing Climbing.'},
+  {name:'Warlocks', color:'#e0562b', tech:'climbing', look:'warlock', style:'warlock', img:'warlocks.jpg', art:'warlocks-wide.jpg', desc:'Armored sorcerers of the ember peaks. They start the game knowing Climbing.'},
+  {name:'Elves', color:'#4f9d3a', tech:'hunting', look:'elf', style:'elf', img:'elves.jpg', art:'elves-wide.jpg', desc:'Archers of the old forests. They start the game knowing Hunting.'},
+  {name:'Pale Ones', color:'#d9b98a', tech:'fishing', look:'pale', style:'pale', img:'paleones.jpg', art:'paleones-wide.jpg', desc:'Blind hunters from the caves under the sea. They start the game knowing Fishing.'},
 ];
 let pickTribe = 0;
 function portrait(canvas, col, look, z){
