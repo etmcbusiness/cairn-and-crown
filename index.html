@@ -641,10 +641,12 @@ function forecast(a,d){
 }
 function attack(a,d){
   const {dmg, ret} = forecast(a,d); const A = U(a);
+  if (a.shp == null) a.shp = a.hp; if (d.shp == null) d.shp = d.hp;
   const vis = explored(a.x,a.y) || explored(d.x,d.y);
   d.hp -= dmg; a.attacked = true; a.moved = true; a.rested = false;
   const back = d.hp > 0 ? ret : 0; if (back) a.hp -= back;
-  anim({type:'atk', a, d, dmg, ret:back, vis});
+  anim({type:'atk', a, d, dmg, vis, after:Math.max(0,d.hp)});
+  if (back) anim({type:'atk', a:d, d:a, dmg:back, vis, counter:true, after:Math.max(0,a.hp)});
   if (d.hp <= 0){
     killUnit(d, a.owner);
     if (A.range===1 && passable(a,d.x,d.y) && !unitAt(d.x,d.y)){ const from = [a.x,a.y]; a.x = d.x; a.y = d.y; anim({type:'move', u:a, from, to:[a.x,a.y], vis}); if (a.owner===0) reveal(a.x,a.y,1); }
@@ -1820,7 +1822,7 @@ function drawUnit(u, now){
   const done = u.owner===0 && !u.dead && !G.over && !canMove(u) && !targets(u).length && !canCapture(u);
   const sc = (u.pop==null ? 1 : Math.max(0, easeBack(u.pop))) * (u.fade==null ? 1 : .55 + .45*u.fade);
   if (sc <= 0.01) return;
-  if (selected){ const p = REDUCED ? 0 : Math.sin(now/220)*1.5; ctx.strokeStyle='#ffc53d'; ctx.lineWidth=2.4; ctx.beginPath(); ctx.ellipse(cx,ground,15+p,7.5+p/2,0,0,Math.PI*2); ctx.stroke(); }
+  if (selected){ const p = REDUCED ? 0 : Math.sin(now/220)*1.5; ctx.strokeStyle='#7fe3ff'; ctx.lineWidth=2.4; ctx.beginPath(); ctx.ellipse(cx,ground,15+p,7.5+p/2,0,0,Math.PI*2); ctx.stroke(); }
   ctx.save();
   ctx.globalAlpha = (done ? .7 : 1) * (u.fade==null ? 1 : u.fade);
   ctx.translate(cx+sx, ground); ctx.scale(sc, sc);
@@ -1833,22 +1835,29 @@ function drawUnit(u, now){
   if (done){ ctx.filter = 'saturate(.55)'; }
   if (u.flash && now - u.flash >= 0 && now - u.flash < 170) ctx.filter = 'brightness(2.6) saturate(.4)';
   const spr = spriteFor(look, u.face || 1);
+  if (spr && selected){ ctx.shadowColor = 'rgba(127,227,255,.95)'; ctx.shadowBlur = 7; }
   if (spr){ const sh = SPR_H[look], sw = sh*spr.naturalWidth/spr.naturalHeight, bob = REDUCED ? 0 : Math.sin(now/320 + u.id)*.6; ctx.drawImage(spr, -sw/2, -sh + 1.5 - bob, sw, sh + bob); }
   else { ctx.save(); ctx.scale(u.face || 1, 1); figure(0, 0, col, look, now, u.id); ctx.restore(); }
-  ctx.filter = 'none';
+  ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
   const hy = spr ? -(SPR_H[look] + 5) : (look==='horse' ? -48 : -38);
   circle(10, hy, 7, '#ffffff'); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(10, hy, 7, 0, Math.PI*2); ctx.stroke();
   ctx.fillStyle = shade(col,.55); ctx.font = '800 9px Nunito, "Segoe UI Symbol", "Apple Color Emoji", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(d.glyph, 10, hy+.5);
-  const hpTxt = String(Math.max(0,u.hp)); ctx.font = '800 8px Nunito, system-ui, sans-serif'; const hw = ctx.measureText(hpTxt).width + 8;
-  ctx.fillStyle = u.hp < d.hp*.4 ? '#c8402f' : 'rgba(10,20,34,0.9)'; ctx.beginPath(); ctx.roundRect(-22, hy-5.5, hw, 11, 5.5); ctx.fill();
+  if (u.dead){ ctx.restore(); return; }
+  const hpTxt = String(Math.max(0, u.shp ?? u.hp)); ctx.font = '800 8px Nunito, system-ui, sans-serif'; const hw = ctx.measureText(hpTxt).width + 8;
+  ctx.fillStyle = (u.shp ?? u.hp) < d.hp*.4 ? '#c8402f' : 'rgba(10,20,34,0.9)'; ctx.beginPath(); ctx.roundRect(-22, hy-5.5, hw, 11, 5.5); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.fillText(hpTxt, -22+hw/2, hy+.3);
   ctx.restore();
 }
 
 /* ---------- animation queue ---------- */
 const AQ = [], GHOSTS = []; let AC = null, afterAnim = null, wasBusy = false;
-const DUR = {move:250, atk:640, die:380, spawn:320, city:450};
-const SLASH = [], BITS = [];
+const DUR = {move:220, atk:520, die:700, spawn:320, city:450};
+const SLASH = [], BITS = [], HITS = [], SHARDS = [];
+function shatter(u){
+  const col = G.players[u.owner].color, base = ['#f1ece4','#d9d2c6', col, shade(col,1.2)];
+  for (let i=0;i<14;i++){ const a = Math.random()*Math.PI*2, s = 18 + Math.random()*34;
+    SHARDS.push({x:u.dx, y:u.dy, vx:Math.cos(a)*s, vy:-30 - Math.random()*45, rot:Math.random()*6.3, vr:(Math.random()-.5)*7, size:3 + Math.random()*4.5, col:base[i%4], t0:performance.now(), life:820 + Math.random()*300}); }
+}
 function burst(x, y, col, n){
   for (let i=0;i<n;i++){ const a = Math.random()*Math.PI*2, s = 30 + Math.random()*55;
     BITS.push({x, y, vx:Math.cos(a)*s, vy:-40 - Math.random()*70, ox:0, oy:0, t0:performance.now(), life:520 + Math.random()*260, size:1.6 + Math.random()*2.2, col: i%3===0 ? '#ffffff' : col}); }
@@ -1858,7 +1867,7 @@ const busy = () => !!AC || AQ.length > 0;
 let bannerOwner = -1, camHome = null;
 function startEv(e, now){
   e.t0 = now; e.hit = false;
-  if (e.type==='die' && e.dur && !REDUCED){ e.u.flash = now; burst(e.u.dx, e.u.dy, G.players[e.u.owner].color, 24); burst(e.u.dx, e.u.dy, '#d8d2c6', 10); }
+  if (e.type==='die' && e.dur && !REDUCED){ e.u.flash = now; shatter(e.u); }
   const u = e.u || e.a;
   if (e.dur && u && u.owner !== 0 && bannerOwner !== u.owner){ bannerOwner = u.owner; banner(`${G.players[u.owner].name} are moving…`, '', 0); }
   if (e.dur && u && u.owner !== 0 && !camA){
@@ -1873,26 +1882,22 @@ function playEv(e, k, now){
   if (e.type==='atk' && k===0){ const sx = (e.d.dx-e.d.dy) - (e.a.dx-e.a.dy); if (sx) e.a.face = sx > 0 ? -1 : 1; }
   if (e.type==='move'){
     const q = easeIO(k); e.u.dx = e.from[0] + (e.to[0]-e.from[0])*q; e.u.dy = e.from[1] + (e.to[1]-e.from[1])*q;
-    e.u.hop = Math.sin(Math.PI*k)*10;
+    e.u.hop = Math.sin(Math.PI*k)*4;
     if (k>=1){ e.u.dx = e.to[0]; e.u.dy = e.to[1]; e.u.hop = 0; }
   } else if (e.type==='atk'){
-    const dx = e.d.dx - e.a.dx, dy = e.d.dy - e.a.dy, len = Math.hypot(dx,dy) || 1, reach = e.ranged ? .12 : .38;
-    const sdir = Math.sign((e.d.dx - e.d.dy) - (e.a.dx - e.a.dy)) || 1;
-    let l, sq = 0;
-    if (k < .3){ const q = Math.sin(k/.3*Math.PI/2); l = -.12*q; sq = q; }                         // wind-up: lean back, crouch
-    else if (k < .48){ const q = easeIO((k-.3)/.18); l = -.12 + (reach+.12)*q; sq = 1 - 2*q; }      // strike: lunge forward, stretch
-    else { const q = easeIO((k-.48)/.52); l = reach*(1-q); sq = -1*(1-q); }                          // recover
+    const dx = e.d.dx - e.a.dx, dy = e.d.dy - e.a.dy, len = Math.hypot(dx,dy) || 1, reach = e.ranged ? .14 : .62;
+    let l;
+    if (k < .34){ const q = easeIO(k/.34); l = reach*q; e.a.hop = Math.sin(Math.PI*q*.5)*7; }   // leap in
+    else if (k < .5){ l = reach; e.a.hop = 7*(1 - (k-.34)/.16); }                             // contact
+    else { const q = easeIO((k-.5)/.5); l = reach*(1-q); e.a.hop = Math.sin(Math.PI*q)*3; }  // snap back
     e.a.ox = dx/len*l; e.a.oy = dy/len*l; e.k = k;
-    e.a.tilt = sdir * (k < .3 ? -.10*sq : k < .48 ? .22*Math.max(0,-sq) : .22*Math.max(0,-sq));
-    e.a.sqx = 1 + .08*sq; e.a.sqy = 1 - .08*sq;
-    if (!e.hit && k >= .44){
-      e.hit = true; fx(e.d.x, e.d.y, '-'+e.dmg, '#ff8a7a');
-      e.d.shake = now; e.d.flash = now; e.d.kb = {t0:now, x:dx/len*.14, y:dy/len*.14};
-      if (!e.ranged) SLASH.push({x:e.d.dx, y:e.d.dy, t0:now, dir:sdir});
-      if (e.vis && !REDUCED) burst(e.d.dx, e.d.dy, G.players[e.a.owner].color, 16);
-      if (e.ret){ fx(Math.round(e.a.dx), Math.round(e.a.dy), '-'+e.ret, '#ff8a7a'); e.a.shake = now + 140; e.a.flash = now + 140; }
+    if (!e.hit && k >= .36){
+      e.hit = true;
+      HITS.push({x:e.d.dx, y:e.d.dy, t0:now, col:G.players[e.a.owner].color, text:String(e.dmg), vis:e.vis});
+      e.d.shake = now; e.d.flash = now; e.d.kb = {t0:now, x:dx/len*.12, y:dy/len*.12};
+      e.d.shp = e.after; if (e.d.shp === e.d.hp) delete e.d.shp;
     }
-    if (k>=1){ e.a.ox = e.a.oy = 0; e.a.tilt = 0; e.a.sqx = e.a.sqy = 1; }
+    if (k>=1){ e.a.ox = e.a.oy = 0; e.a.hop = 0; if (e.d.shp != null){ e.d.shp = e.after; if (e.d.shp === e.d.hp) delete e.d.shp; } }
   } else if (e.type==='die'){
     e.u.fade = 1-k; if (k>=1){ const i = GHOSTS.indexOf(e.u); if (i>=0) GHOSTS.splice(i,1); }
   } else if (e.type==='spawn'){ e.u.pop = k; if (k>=1) delete e.u.pop; }
@@ -1970,6 +1975,32 @@ function frame(now){
   for (const u of G.units) if (explored(Math.round(u.dx),Math.round(u.dy))) objs.push({d:u.dx+u.dy, f:() => drawUnit(u,now)});
   for (const u of GHOSTS) if (explored(u.x,u.y)) objs.push({d:u.dx+u.dy, f:() => drawUnit(u,now)});
   objs.sort((a,b) => a.d-b.d).forEach(o => o.f());
+  for (let i=SHARDS.length-1;i>=0;i--){
+    const b = SHARDS[i], a = (now - b.t0)/b.life; if (a >= 1){ SHARDS.splice(i,1); continue; }
+    const tt = (now - b.t0)/1000, [cx,top] = tileTop(b.x, b.y);
+    const px = cx + b.vx*tt, py = Math.min(top + 4, top - 14 + b.vy*tt + 70*tt*tt), r = b.rot + b.vr*tt, sz = b.size*(1 - a*.3);
+    ctx.globalAlpha = a < .7 ? 1 : 1 - (a-.7)/.3;
+    poly([px + Math.cos(r)*sz, py + Math.sin(r)*sz*.8, px + Math.cos(r+2.3)*sz*.8, py + Math.sin(r+2.3)*sz*.7, px + Math.cos(r+4.1)*sz, py + Math.sin(r+4.1)*sz*.9], b.col);
+    poly([px + Math.cos(r)*sz, py + Math.sin(r)*sz*.8, px, py, px + Math.cos(r+4.1)*sz, py + Math.sin(r+4.1)*sz*.9], 'rgba(0,0,0,.14)');
+    ctx.globalAlpha = 1;
+  }
+  for (let i=HITS.length-1;i>=0;i--){
+    const hh = HITS[i], a = (now - hh.t0)/900; if (a >= 1){ HITS.splice(i,1); continue; }
+    if (!hh.vis || !explored(Math.round(hh.x), Math.round(hh.y))) continue;
+    const [cx,top] = tileTop(hh.x, hh.y), y = top - 16, grow = a < .18 ? easeBack(a/.18) : 1;
+    const fade = a < .55 ? 1 : 1 - (a-.55)/.45;
+    ctx.globalAlpha = fade;
+    for (let j=0;j<10;j++){
+      const ang = j/10*Math.PI*2 + .3, long = (j%2 ? 15 : 22)*grow, w = .32;
+      poly([cx + Math.cos(ang-w)*5, y + Math.sin(ang-w)*5*.8, cx + Math.cos(ang)*long, y + Math.sin(ang)*long*.8, cx + Math.cos(ang+w)*5, y + Math.sin(ang+w)*5*.8], j%2 ? shade(hh.col,1.2) : hh.col);
+    }
+    circle(cx, y, 6*grow, '#ffffff');
+    const fs = Math.round(17*grow);
+    ctx.font = `italic 800 ${fs}px Nunito, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4; ctx.strokeStyle = shade(hh.col,.55); ctx.strokeText(hh.text, cx, y + 1);
+    ctx.fillStyle = '#ffffff'; ctx.fillText(hh.text, cx, y + 1);
+    ctx.globalAlpha = 1;
+  }
   for (let i=SLASH.length-1;i>=0;i--){
     const s = SLASH[i], a = (now - s.t0)/280; if (a >= 1){ SLASH.splice(i,1); continue; }
     if (!explored(Math.round(s.x), Math.round(s.y))) continue;
@@ -2168,7 +2199,7 @@ addEventListener('resize', () => { if (!$('#screens').hidden && !$('#scrTitle').
 
 /* ---------- boot ---------- */
 // Each push stamps a new BUILD. On open, compare with the server copy and reload once if this one is stale.
-const BUILD = '1794297363755';
+const BUILD = '1794297930664';
 function checkForUpdate(){
   if (!/^https?:/.test(location.protocol)) return;
   fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r => r.text()).then(s => {
