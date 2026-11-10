@@ -2117,6 +2117,17 @@ function drawLandscape(){
 addEventListener('resize', () => { if (!$('#screens').hidden && !$('#scrTitle').classList.contains('off')) drawLandscape(); });
 
 /* ---------- boot ---------- */
+// Each push stamps a new BUILD. On open, compare with the server copy and reload once if this one is stale.
+const BUILD = '1794296380609';
+function checkForUpdate(){
+  if (!/^https?:/.test(location.protocol)) return;
+  fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r => r.text()).then(s => {
+    const m = s.match(/const BUILD = '(d+)'/);
+    if (m && m[1] !== BUILD && !location.search.includes('v=' + m[1])) location.replace(location.pathname + '?v=' + m[1]);
+  }).catch(() => {});
+}
+checkForUpdate();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('dblclick', e => e.preventDefault(), {passive:false});
 function boot(){
