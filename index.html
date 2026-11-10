@@ -204,8 +204,10 @@ textarea{font:12px ui-monospace,Consolas,monospace;min-height:120px;resize:verti
 .tribe canvas{width:104px;height:104px;border-radius:50%;background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.22),rgba(255,255,255,.04));box-shadow:0 0 0 4px var(--c)}
 .tribe b{font:400 17px var(--display);letter-spacing:.3px}
 .tribe small{color:var(--muted);font-weight:700;font-size:12px}
-.tribe[aria-pressed="true"]{border-color:var(--gold);transform:translateY(-2px);background:rgba(255,197,61,.1)}
-.tcard{width:100%;max-width:420px;background:rgba(5,8,20,.85);border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:10px;text-align:center}
+.tribes:has(.tribe[aria-pressed="true"]) .tribe:not([aria-pressed="true"]){opacity:.55}
+.tribe[aria-pressed="true"]{border-color:var(--gold);transform:translateY(-3px) scale(1.03);background:rgba(255,197,61,.12);box-shadow:0 0 0 2px var(--gold),0 0 26px rgba(255,197,61,.45)}
+.tribe[aria-pressed="true"] img,.tribe[aria-pressed="true"] canvas{box-shadow:0 0 0 4px var(--gold),0 0 18px rgba(255,197,61,.6)}
+.tcard{width:100%;max-width:420px;display:grid;justify-items:center;padding-top:6px}
 .tcard b{font:400 22px var(--display)}
 .tcard p{margin:0;color:#dfe6ea;line-height:1.45}
 .tcard .pbtn{justify-self:center}
@@ -2033,7 +2035,7 @@ function renderTribes(){
   $('#tribes').innerHTML = tr.map((t,i) => `<button class="tribe" data-tribe="${i}" aria-pressed="${i===pickTribe}" style="--c:${t.color}">${t.img ? `<img src="${t.img}" alt="">` : '<canvas></canvas>'}<b>${esc(t.name)}</b><small>Starts with ${TECHS[t.tech].name}</small></button>`).join('');
   document.querySelectorAll('#tribes .tribe').forEach((b,i) => { const c = b.querySelector('canvas'); if (c) portrait(c, tr[i].color, tr[i].look, 2.3); });
   const t = tr[pickTribe];
-  $('#tcard').innerHTML = `${t.art ? `<img class="tart" src="${t.art}" alt="${esc(t.name)}">` : ''}<b style="color:${t.color}">${esc(t.name)}</b><p>${esc(t.desc)}</p><button class="pbtn" id="tPick">Pick</button>`;
+  $('#tcard').innerHTML = `<button class="pbtn" id="tPick">Next</button>`;
 }
 function renderSetup(){
   const s = config.settings;
@@ -2055,7 +2057,7 @@ $('#screens').addEventListener('click', e => {
   if (b.dataset.set){ config.settings[b.dataset.set] = +b.dataset.v; saveConfig(); renderSetup(); return; }
   if (b.id==='tStart'){ launchGame(); return; }
 });
-function renderTribesCard(){ const t = TRIBES()[pickTribe]; $('#tcard').innerHTML = `${t.art ? `<img class="tart" src="${t.art}" alt="${esc(t.name)}">` : ''}<b style="color:${t.color}">${esc(t.name)}</b><p>${esc(t.desc)}</p><button class="pbtn" id="tPick">Pick</button>`; }
+function renderTribesCard(){ const t = TRIBES()[pickTribe]; $('#tcard').innerHTML = `<button class="pbtn" id="tPick">Next</button>`; }
 function launchGame(){
   config = normalizeConfig(config); saveConfig();
   showScreen('scrLoad');
