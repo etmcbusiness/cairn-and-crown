@@ -1799,6 +1799,10 @@ function figure(cx, by, col, look, t, seed){
     cube(cx+10.5, ty-15.5, 4.2, 5.2, STEEL[0], STEEL[1], STEEL[2]);
   }
 }
+// Faction sprites cut from the user's character sheets: '-a' faces right, '-b' faces left.
+const SPR = {}, SPR_H = {wizard:46, warlock:46, elf:47, man:45, orc:44, pale:34};
+for (const k of Object.keys(SPR_H)) SPR[k] = {a:Object.assign(new Image(), {src:`sprites/${k}-a.png`}), b:Object.assign(new Image(), {src:`sprites/${k}-b.png`})};
+function spriteFor(look, face){ const s = SPR[look]; if (!s) return null; const im = face === -1 ? s.a : s.b; return im.complete && im.naturalWidth ? im : null; }
 function drawUnit(u, now){
   const d = U(u), col = G.players[u.owner].color, look = G.players[u.owner].style || lookOf(d);
   const vx = u.dx + (u.ox||0), vy = u.dy + (u.oy||0);
@@ -1820,9 +1824,11 @@ function drawUnit(u, now){
   if (t.t==='water'){ box(0,2,13,3,'#9a6a3e','#7a5030','#b8834f','#b8834f',0); }
   ctx.translate(0, -lift);
   if (done){ ctx.filter = 'saturate(.55)'; }
-  ctx.save(); ctx.scale(u.face || 1, 1); figure(0, 0, col, look, now, u.id); ctx.restore();
+  const spr = spriteFor(look, u.face || 1);
+  if (spr){ const sh = SPR_H[look], sw = sh*spr.naturalWidth/spr.naturalHeight, bob = REDUCED ? 0 : Math.sin(now/320 + u.id)*.6; ctx.drawImage(spr, -sw/2, -sh + 1.5 - bob, sw, sh + bob); }
+  else { ctx.save(); ctx.scale(u.face || 1, 1); figure(0, 0, col, look, now, u.id); ctx.restore(); }
   ctx.filter = 'none';
-  const hy = look==='horse' ? -48 : -38;
+  const hy = spr ? -(SPR_H[look] + 5) : (look==='horse' ? -48 : -38);
   circle(10, hy, 7, '#ffffff'); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(10, hy, 7, 0, Math.PI*2); ctx.stroke();
   ctx.fillStyle = shade(col,.55); ctx.font = '800 9px Nunito, "Segoe UI Symbol", "Apple Color Emoji", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(d.glyph, 10, hy+.5);
   const hpTxt = String(Math.max(0,u.hp)); ctx.font = '800 8px Nunito, system-ui, sans-serif'; const hw = ctx.measureText(hpTxt).width + 8;
@@ -2118,7 +2124,7 @@ addEventListener('resize', () => { if (!$('#screens').hidden && !$('#scrTitle').
 
 /* ---------- boot ---------- */
 // Each push stamps a new BUILD. On open, compare with the server copy and reload once if this one is stale.
-const BUILD = '1794296380609';
+const BUILD = '1794296856090';
 function checkForUpdate(){
   if (!/^https?:/.test(location.protocol)) return;
   fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r => r.text()).then(s => {
