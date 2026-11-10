@@ -1,0 +1,1434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Cairn &amp; Crown</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cairn &amp; Crown">
+<meta name="theme-color" content="#10303e">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;700;800&family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed isometric map canvas, a slim top HUD, a bottom dock for the selected unit or city, and modal cards for research, goals and the workshop. Single committed dusk-ocean look. */
+:root{
+  color-scheme:dark;
+  --sea:#1d4c60; --sea-deep:#10303e;
+  --panel:rgba(13,38,49,.93); --panel-2:#1c4a5c; --panel-3:#245a6e;
+  --line:rgba(226,240,240,.14);
+  --ink:#eef5f2; --muted:#9dbcc4;
+  --gold:#ffc53d; --gold-ink:#3d2b00;
+  --danger:#ff7262; --ok:#86dc9b;
+  --display:"Lilita One","Trebuchet MS",system-ui,sans-serif;
+  --body:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--sea-deep);color:var(--ink);font-family:var(--body);overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;position:fixed;inset:0}
+button{touch-action:manipulation}
+[hidden]{display:none!important}
+#app{position:fixed;inset:0}
+#map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#map:active{cursor:grabbing}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+#hud{position:absolute;top:0;left:0;right:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
+  padding-top:calc(env(safe-area-inset-top,0px) + 10px);padding-bottom:10px;
+  background:linear-gradient(to bottom,rgba(10,30,40,.85),rgba(10,30,40,0));pointer-events:none}
+#hud > *{pointer-events:auto}
+.brand{font-family:var(--display);font-size:22px;letter-spacing:.5px;color:var(--ink);margin-right:6px;text-shadow:0 2px 0 rgba(0,0,0,.3)}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-weight:800;font-variant-numeric:tabular-nums;font-size:14px}
+.pill .star{color:var(--gold)}
+.pill small{color:var(--muted);font-weight:700}
+.hud-btns{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+
+.btn{font:800 14px var(--body);border-radius:10px;padding:8px 12px;background:var(--panel-2);color:var(--ink);border:1px solid var(--line);cursor:pointer;line-height:1.15}
+.btn:hover:not(:disabled){background:var(--panel-3)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.gold{background:var(--gold);color:var(--gold-ink);border-color:transparent}
+.btn.gold:hover:not(:disabled){background:#ffd468}
+.btn.danger{color:var(--danger)}
+.btn.ghost{background:transparent}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+#dock{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);pointer-events:none}
+#dock > *{pointer-events:auto}
+#panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;width:min(460px,100%);max-height:42vh;overflow:auto;backdrop-filter:blur(6px);display:grid;gap:8px;min-width:0}
+#panel{width:100%}
+#endTurn{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(100% + 10px);font:20px var(--display);letter-spacing:.5px;padding:12px 18px;border-radius:14px;box-shadow:0 6px 0 #b3830f,0 10px 20px rgba(0,0,0,.35)}
+#endTurn:active{transform:translateY(3px);box-shadow:0 3px 0 #b3830f}
+.brand{font-size:19px}
+.hud-btns{width:100%;margin-left:0}
+.hud-btns .btn{flex:1;padding:8px 6px}
+
+.p-head{display:flex;align-items:center;gap:10px}
+.p-head b{font-family:var(--display);font-weight:400;font-size:19px;letter-spacing:.3px;display:block}
+.p-head small{color:var(--muted);font-weight:700}
+.p-head .right{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.tok{flex:none;width:36px;height:36px;border-radius:50%;background:#fff;color:var(--c,#333);display:grid;place-items:center;font-weight:800;font-size:17px;box-shadow:0 0 0 3px var(--c,#333)}
+.stats{display:flex;flex-wrap:wrap;gap:6px}
+.stat{background:var(--panel-2);border-radius:8px;padding:3px 8px;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-weight:700;margin-right:3px;text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;border:1px solid var(--line);color:var(--muted)}
+.acts{display:flex;flex-wrap:wrap;gap:6px}
+.hint{margin:0;color:var(--muted);font-size:13px}
+.train{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px}
+.train .btn{display:flex;align-items:center;gap:8px;text-align:left;padding:6px 8px}
+.train .btn .tok{width:26px;height:26px;font-size:13px;box-shadow:0 0 0 2px var(--c)}
+.train .btn small{display:block;font-weight:700;color:var(--muted);font-size:11px}
+.pips{display:inline-flex;gap:3px;vertical-align:middle}
+.pips i{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--gold)}
+.pips i.on{background:var(--gold)}
+
+#toast{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);display:grid;gap:6px;justify-items:center;pointer-events:none;width:min(92vw,520px)}
+.t-msg{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 14px;font-weight:800;font-size:14px;text-align:center;animation:tin .25s ease-out}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}}
+
+#modal{position:fixed;inset:0;background:rgba(5,18,24,.62);display:grid;place-items:center;z-index:20;
+  padding-top:calc(env(safe-area-inset-top,0px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px)}
+.card{background:#163d4e;border:1px solid var(--line);border-radius:18px;padding:20px;width:min(780px,100%);max-height:min(88vh,860px);overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.45);display:grid;gap:14px;min-width:0}
+.card h2{font-family:var(--display);font-weight:400;font-size:30px;letter-spacing:.4px;margin:0;text-wrap:balance}
+.card h3{font-family:var(--display);font-weight:400;font-size:19px;margin:0;letter-spacing:.3px}
+.card p{margin:0;line-height:1.5;max-width:65ch}
+.card-top{display:flex;align-items:flex-start;gap:12px}
+.card-top .x{margin-left:auto}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+.objs{display:grid;gap:8px}
+.obj{background:var(--panel-2);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.obj .top{display:flex;gap:8px;align-items:baseline}
+.obj .top b{font-size:15px}
+.obj .top small{color:var(--muted);font-weight:700}
+.obj .top .num{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.bar{height:7px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--gold);border-radius:99px}
+.obj.done .bar i{background:var(--ok)}
+.obj.done .num{color:var(--ok)}
+
+.techwrap{overflow-x:auto}
+.techgrid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;min-width:640px}
+.tcol{display:grid;gap:8px;align-content:start}
+.tcol h4{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.tech{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:left;color:var(--ink);font:inherit;cursor:pointer;display:grid;gap:3px}
+.tech b{font-size:14px}
+.tech small{color:var(--muted);font-size:12px;line-height:1.35}
+.tech .cost{font-weight:800;color:var(--gold);font-size:13px}
+.tech.owned{background:rgba(134,220,155,.14);border-color:rgba(134,220,155,.5);cursor:default}
+.tech.owned .cost{color:var(--ok)}
+.tech.locked{opacity:.45;cursor:not-allowed}
+.tech:disabled{cursor:not-allowed}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tab{background:none;border:none;color:var(--muted);font:800 14px var(--body);padding:8px 12px;border-bottom:3px solid transparent;cursor:pointer}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--gold)}
+.ws{display:grid;grid-template-columns:210px minmax(0,1fr);gap:14px}
+@media (max-width:640px){.ws{grid-template-columns:1fr}}
+.ws-list{display:grid;gap:6px;align-content:start}
+.ws-list .btn{display:flex;align-items:center;gap:8px;text-align:left}
+.ws-list .btn[aria-current="true"]{border-color:var(--gold);background:var(--panel-3)}
+.ws-list .tok{width:26px;height:26px;font-size:13px;box-shadow:0 0 0 2px var(--c)}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.field{display:grid;gap:4px;min-width:0}
+.field.wide{grid-column:1/-1}
+.field label,.lbl{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+input,select,textarea{-webkit-user-select:text;user-select:text;font:700 16px var(--body);color:var(--ink);background:var(--sea-deep);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%;min-width:0}
+textarea{font:12px ui-monospace,Consolas,monospace;min-height:120px;resize:vertical}
+.checks{display:flex;flex-wrap:wrap;gap:6px}
+.check{display:flex;gap:6px;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:6px 9px;font-size:13px;font-weight:700;cursor:pointer}
+.check input{width:auto}
+.check small{color:var(--muted);font-weight:700}
+.warn{color:var(--gold);font-weight:800;font-size:13px}
+.err{color:var(--danger);font-weight:800;font-size:13px}
+.orow{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.3fr) 80px minmax(0,1fr) auto;gap:6px;align-items:end;background:var(--panel-2);border-radius:12px;padding:10px}
+@media (max-width:640px){.orow{grid-template-columns:1fr 1fr}}
+.reward{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.reward .btn{padding:16px;text-align:left;display:grid;gap:4px}
+.reward .btn b{font-family:var(--display);font-weight:400;font-size:20px}
+.reward .btn small{color:var(--muted);font-weight:700;font-size:13px}
+@media (max-width:480px){.reward{grid-template-columns:1fr}}
+.endstats{display:flex;flex-wrap:wrap;gap:8px}
+@media (prefers-reduced-motion:reduce){.t-msg{animation:none}}
+
+/* ---- Research constellation (ported from peterhaight.com's goal constellations) ---- */
+#sky{--text:#f3ecdf;--dim:rgba(243,236,223,.55);--sline:rgba(243,236,223,.18);--cdisplay:'Cinzel',serif;--cbody:'Inter',system-ui,sans-serif;--accent:#f3d58f;
+  position:fixed;inset:0;z-index:25;background:#04050a;color:var(--text);font-family:var(--cbody);overflow:hidden;animation:sky-in .45s ease both}
+@keyframes sky-in{from{opacity:0}}
+#skyCv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#sky .treehead{position:absolute;left:0;right:0;top:max(14px,env(safe-area-inset-top));display:flex;align-items:center;gap:10px;padding:0 6px;pointer-events:none}
+#sky .treehead > *{pointer-events:auto}
+#sky .treehead .th{flex:1;text-align:center}
+#sky .treehead h2{margin:0;font-family:var(--cdisplay);font-weight:700;font-size:20px;letter-spacing:.16em;text-transform:uppercase;text-shadow:0 0 14px var(--accent)}
+#sky .treehead h2 b{margin-left:.4em}
+#sky .sbar{height:2px;background:var(--sline);position:relative;overflow:hidden;width:60%;margin:7px auto 5px}
+#sky .sbar i{position:absolute;inset:0 auto 0 0;background:var(--accent);box-shadow:0 0 8px var(--accent);transition:width .6s}
+#sky .stats{display:block;font-size:12px;color:var(--dim)}
+#sky .icon{width:44px;height:44px;border:none;background:none;color:var(--text);font-size:26px;line-height:1;flex:none}
+#skyLabels{position:absolute;inset:0;pointer-events:none}
+#skyLabels .lab{position:absolute;left:0;top:0}
+#sky .label{color:rgba(243,236,223,.7);font:500 10px/1.2 var(--cbody);letter-spacing:.04em;white-space:nowrap;transform:translate(-50%,-50%) translateY(-24px);text-shadow:0 0 6px #000,0 0 2px #000;animation:label-in .9s .5s both;transition:transform .4s,font-size .4s}
+#sky .label.done{color:#f4e2bc}
+#sky .label.root{font:600 11px/1.2 var(--cdisplay);letter-spacing:.1em;text-transform:uppercase;color:rgba(243,236,223,.85)}
+#sky .label.focus{font:700 17px/1.2 var(--cdisplay);letter-spacing:.08em;text-transform:none;color:var(--text);transform:translate(-50%,-50%) translateY(-40px);text-shadow:0 0 12px var(--accent),0 0 4px #000}
+@keyframes label-in{from{opacity:0}}
+#sky .sheet{position:absolute;left:0;right:0;bottom:0;padding:24px 22px max(22px,env(safe-area-inset-bottom));text-align:center;background:linear-gradient(to top,rgba(6,8,16,.94),rgba(10,12,24,.8));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--sline);border-radius:20px 20px 0 0;transform:translateY(105%);transition:transform .45s cubic-bezier(.2,.8,.2,1);max-height:62vh;overflow-y:auto}
+#sky .sheet.open{transform:none}
+#sky .sheet .goal{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+#sky .sheet h2{margin:6px 0 8px;font-family:var(--cdisplay);font-size:26px;letter-spacing:.04em}
+#sky .sheet .end{font-size:13px;color:var(--dim);line-height:1.45}
+#sky .sheet .status{margin:12px 0 16px;font-size:12px;color:var(--dim)}
+#sky .sheet .primary{width:100%;min-height:48px;padding:14px 18px;border-radius:999px;font:600 13px var(--cbody);letter-spacing:.16em;text-transform:uppercase;border:none;color:#1b1206;background:linear-gradient(#f3d58f,#c9973f);box-shadow:0 0 22px rgba(243,201,120,.35)}
+#sky .sheet .primary:disabled{opacity:.4;box-shadow:none}
+#sky .sheet .close{position:absolute;top:8px;right:10px;width:44px;height:44px;border:none;background:none;color:var(--dim);font-size:26px}
+#sky .sheet .blocked{padding:13px 16px;border:1px dashed var(--sline);border-radius:999px;font-size:13px;color:var(--dim)}
+#sky .sheet .hint{margin-top:14px;font-size:11px;color:var(--dim);letter-spacing:.04em}
+#sky .skyhint{position:absolute;left:0;right:0;bottom:max(26px,env(safe-area-inset-bottom));text-align:center;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);pointer-events:none;transition:opacity .4s}
+#modal{z-index:30}
+</style>
+</head>
+<body>
+
+<div id="sky" hidden>
+  <canvas id="skyCv"></canvas>
+  <div id="skyLabels"></div>
+  <div class="treehead">
+    <button class="icon" id="skyBack" aria-label="Back to the map">‹</button>
+    <div class="th"><h2>Research</h2><div class="sbar"><i id="skyBar"></i></div><div class="stats" id="skyStats"></div></div>
+    <span style="width:44px;flex:none"></span>
+  </div>
+  <div class="skyhint" id="skyHint">Tap a star</div>
+  <div class="sheet" id="skySheet" aria-live="polite"></div>
+</div>
+
+<div id="app">
+  <canvas id="map" aria-label="Game map. Tap a unit to select it, tap a highlighted tile to move or attack. Drag to pan, pinch or scroll to zoom."></canvas>
+  <header id="hud" class="gut">
+    <span class="brand">Cairn &amp; Crown</span>
+    <span class="pill" id="hStars"></span>
+    <span class="pill" id="hTurn"></span>
+    <span class="pill" id="hScore"></span>
+    <div class="hud-btns">
+      <button class="btn" id="bTech">Research</button>
+      <button class="btn" id="bGoals">Goals</button>
+      <button class="btn" id="bWork">Workshop</button>
+      <button class="btn" id="bNew">New</button>
+    </div>
+  </header>
+  <div id="toast"></div>
+  <div id="dock" class="gut">
+    <section id="panel" aria-live="polite"></section>
+    <button class="btn gold" id="endTurn">End turn</button>
+  </div>
+</div>
+<div id="modal" hidden></div>
+
+<script>
+(() => {
+'use strict';
+/* ---------- constants & data ---------- */
+const TW = 64, TH = 32, LAND_H = 7;
+const DIRS8 = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+const PLAYER_COLORS = ['#ff7a59','#4fb3e8','#a3d955','#c58cf0'];
+const RIVAL_NAMES = ['Tidecallers','Moss Wardens','Ashfolk'];
+const CFG_KEY = 'cairn-crown-config-v1';
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const TECHS = {
+  foraging:{name:'Foraging',tier:0,req:null,desc:'Gather fruit around your cities.'},
+  hunting:{name:'Hunting',tier:1,req:'foraging',desc:'Hunt game in forests.'},
+  fishing:{name:'Fishing',tier:1,req:'foraging',desc:'Catch fish in the shallows.'},
+  climbing:{name:'Climbing',tier:1,req:'foraging',desc:'Units can enter mountains.'},
+  riding:{name:'Riding',tier:1,req:'foraging',desc:'Tame mounts for fast units.'},
+  herbalism:{name:'Herbalism',tier:1,req:'foraging',desc:'Remedies and healers.'},
+  archery:{name:'Archery',tier:2,req:'hunting',desc:'Ranged weapons.'},
+  sailing:{name:'Sailing',tier:2,req:'fishing',desc:'Units can cross water.'},
+  masonry:{name:'Masonry',tier:2,req:'climbing',desc:'Build mines on ore.'},
+  trade:{name:'Trade',tier:2,req:'riding',desc:'+1 star per city each turn.'},
+  farming:{name:'Farming',tier:2,req:'herbalism',desc:'Build farms on open grassland.'},
+  smithing:{name:'Smithing',tier:3,req:'masonry',desc:'Heavy arms and armor.'},
+};
+const SKILLS = {
+  dash:{name:'Dash',desc:'Can attack after moving'},
+  stalwart:{name:'Stalwart',desc:'+50% defense everywhere'},
+  heal:{name:'Mend',desc:'Action: heal adjacent allies 4 HP'},
+  climb:{name:'Climber',desc:'Enters mountains without Climbing'},
+  swim:{name:'Swimmer',desc:'Crosses water without Sailing'},
+  pathfinder:{name:'Pathfinder',desc:'Forests and mountains don’t stop it'},
+};
+const HARV = {
+  fruit:{tech:'foraging',cost:2,pop:1,label:'Gather fruit'},
+  game:{tech:'hunting',cost:2,pop:1,label:'Hunt game'},
+  fish:{tech:'fishing',cost:2,pop:1,label:'Catch fish'},
+  ore:{tech:'masonry',cost:5,pop:2,label:'Build a mine'},
+};
+const FARM = {tech:'farming',cost:5,pop:2,label:'Build a farm'};
+const REWARDS = {
+  workshop:['Workshop','+1 star every turn'],
+  walls:['City walls','Units defending here are far harder to beat'],
+  stash:['Treasury','+5 stars right now'],
+  borders:['Wider borders','Claim land two tiles out'],
+  recruit:['Recruits','A free unit of your strongest known type'],
+};
+const OBJ = {
+  conquer:{label:'Own cities',n:4,fmt:o=>`Own ${o.n} cities`},
+  level:{label:'Grow a city',n:3,fmt:o=>`Grow a city to level ${o.n}`},
+  research:{label:'Research',n:5,fmt:o=>`Research ${o.n} technologies`},
+  army:{label:'Field an army',n:3,fmt:o=>`Field ${o.n} × ${unitName(o.unit)}`},
+  shrine:{label:'Hold the Shrine',n:3,fmt:o=>`Hold the Shrine for ${o.n} turns in a row`},
+  score:{label:'Reach a score',n:1500,fmt:o=>`Reach ${o.n} points`},
+  eliminate:{label:'Defeat all rivals',n:1,fmt:()=>`Defeat every rival tribe`},
+  survive:{label:'Survive',n:20,fmt:o=>`Survive until turn ${o.n}`},
+  stars:{label:'Bank stars',n:30,fmt:o=>`Bank ${o.n} stars at once`},
+};
+const TERRAIN_NAME = {plains:'Grassland',forest:'Forest',mountain:'Mountain',water:'Water'};
+const RES_NAME = {fruit:'Wild fruit',game:'Game',fish:'Fish',ore:'Ore'};
+
+const DEFAULT_CONFIG = {
+  scenario:{name:'First Landing',tribe:'Emberkin',mode:'all',turnLimit:30},
+  settings:{rivals:2,size:14},
+  units:[
+    {id:'scout',name:'Scout',glyph:'⚔',hp:10,atk:2,def:2,move:1,range:1,cost:2,tech:'',skills:['dash']},
+    {id:'archer',name:'Archer',glyph:'➶',hp:10,atk:2,def:1,move:1,range:2,cost:3,tech:'archery',skills:['dash']},
+    {id:'rider',name:'Rider',glyph:'♞',hp:10,atk:2,def:1,move:2,range:1,cost:3,tech:'riding',skills:['dash']},
+    {id:'guard',name:'Guard',glyph:'♜',hp:15,atk:1,def:3,move:1,range:1,cost:3,tech:'masonry',skills:['stalwart']},
+    {id:'mender',name:'Mender',glyph:'✚',hp:8,atk:0,def:1,move:1,range:1,cost:4,tech:'herbalism',skills:['heal']},
+    {id:'brute',name:'Brute',glyph:'⚒',hp:20,atk:4,def:3,move:1,range:1,cost:8,tech:'smithing',skills:[]},
+  ],
+  objectives:[
+    {title:'Spread out',type:'conquer',n:4,unit:''},
+    {title:'Learn the land',type:'research',n:5,unit:''},
+  ],
+};
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const cheb = (a,b,c,d) => Math.max(Math.abs(a-c), Math.abs(b-d));
+const shuffle = a => { for (let i=a.length-1;i>0;i--){ const j=Math.random()*(i+1)|0; [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const clone = o => JSON.parse(JSON.stringify(o));
+function shade(hex, f){
+  const n = parseInt(hex.slice(1),16); let r=n>>16, g=n>>8&255, b=n&255;
+  r=clamp(Math.round(r*f),0,255); g=clamp(Math.round(g*f),0,255); b=clamp(Math.round(b*f),0,255);
+  return '#'+((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1);
+}
+function rgba(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${n>>8&255},${n&255},${a})`; }
+
+/* ---------- config ---------- */
+function normalizeConfig(c){
+  const d = clone(DEFAULT_CONFIG);
+  if (!c || typeof c !== 'object') return d;
+  const out = {scenario:{...d.scenario, ...(c.scenario||{})}, settings:{...d.settings, ...(c.settings||{})}};
+  out.scenario.name = String(out.scenario.name||'Untitled').slice(0,40);
+  out.scenario.tribe = String(out.scenario.tribe||'Your tribe').slice(0,24);
+  out.scenario.mode = out.scenario.mode === 'any' ? 'any' : 'all';
+  out.scenario.turnLimit = clamp(parseInt(out.scenario.turnLimit)||0, 0, 200);
+  out.settings.rivals = clamp(parseInt(out.settings.rivals)||2, 1, 3);
+  out.settings.size = [12,14,16].includes(+out.settings.size) ? +out.settings.size : 14;
+  const units = Array.isArray(c.units) && c.units.length ? c.units : d.units;
+  const seen = new Set();
+  out.units = units.slice(0,16).map((u,i) => {
+    let id = String(u.id || 'u'+i).replace(/[^\w-]/g,'').slice(0,24) || 'u'+i;
+    while (seen.has(id)) id += 'x'; seen.add(id);
+    return {
+      id, name:String(u.name||'Unit').slice(0,20), glyph:[...String(u.glyph||'?')].slice(0,2).join('') || '?',
+      hp:clamp(+u.hp||10,1,40), atk:clamp(+u.atk||0,0,8), def:clamp(+u.def||0,0,8),
+      move:clamp(+u.move||1,1,4), range:clamp(+u.range||1,1,3), cost:clamp(+u.cost||1,1,20),
+      tech: TECHS[u.tech] && u.tech !== 'foraging' ? u.tech : '',
+      skills:(Array.isArray(u.skills)?u.skills:[]).filter(s => SKILLS[s]),
+    };
+  });
+  const objs = Array.isArray(c.objectives) ? c.objectives : d.objectives;
+  out.objectives = objs.slice(0,8).filter(o => OBJ[o.type]).map(o => ({
+    title:String(o.title||'').slice(0,40), type:o.type, n:clamp(parseInt(o.n)||OBJ[o.type].n,1,99999), unit:String(o.unit||''),
+  }));
+  return out;
+}
+function loadConfig(){ try { const s = localStorage.getItem(CFG_KEY); if (s) return normalizeConfig(JSON.parse(s)); } catch(e){} return clone(DEFAULT_CONFIG); }
+function saveConfig(){ try { localStorage.setItem(CFG_KEY, JSON.stringify(config)); } catch(e){} }
+let config = loadConfig();
+const unitName = id => { const src = (G && G.rules) ? G.rules.units : config.units; const u = src.find(x => x.id === id); return u ? u.name : '(missing character)'; };
+
+/* ---------- game state ---------- */
+let G = null, sel = null, selReach = new Set(), selTargets = [];
+const cam = {x:0, y:0, z:1};
+const FX = [];
+
+const tileAt = (x,y) => G.tiles[x + y*G.n];
+const inB = (x,y) => x>=0 && y>=0 && x<G.n && y<G.n;
+const U = u => G.rules.units.find(d => d.id === u.type) || G.rules.units[0];
+const has = (d,s) => d.skills.includes(s);
+const unitAt = (x,y) => G.units.find(u => u.x===x && u.y===y);
+const cityById = id => G.cities.find(c => c.id === id);
+const cityAt = (x,y) => { const t = tileAt(x,y); return t.city ? cityById(t.city) : null; };
+const terrOwner = t => { if (t.terr < 0) return -1; const c = cityById(t.terr); return c ? c.owner : -1; };
+const citiesOf = pid => G.cities.filter(c => c.owner === pid);
+const unitsOf = pid => G.units.filter(u => u.owner === pid);
+const hasTech = (p,id) => !id || p.techs.includes(id);
+const me = () => G.players[0];
+const explored = (x,y) => !!G.players[0].explored[x + y*G.n];
+const power = d => d.atk*2 + d.def*1.5 + d.hp/5 + d.move + (d.range-1)*2 + (has(d,'heal')?3:0);
+const starterDef = () => G.rules.units.find(d => !d.tech) || G.rules.units[0];
+const isShallow = (x,y) => DIRS8.some(([dx,dy]) => inB(x+dx,y+dy) && tileAt(x+dx,y+dy).t !== 'water');
+
+const SYL = ['ka','lo','mir','ten','vos','ra','dun','el','sha','tor','bri','nu','gal','fen','ost','ru','lia','mok','ve','zan','ith','po','qua','ser'];
+function cityName(){
+  for (let k=0;k<30;k++){ const n = SYL[Math.random()*SYL.length|0] + SYL[Math.random()*SYL.length|0] + (Math.random()<.3 ? SYL[Math.random()*SYL.length|0] : '');
+    const name = n[0].toUpperCase() + n.slice(1); if (!G.cities.some(c => c.name === name)) return name; }
+  return 'Town ' + G.cities.length;
+}
+
+/* ---------- map generation ---------- */
+function genMap(n, np){
+  for (let attempt=0; attempt<40; attempt++){
+    let h = Array.from({length:n*n}, () => Math.random());
+    for (let k=0;k<3;k++){
+      const h2 = h.slice();
+      for (let y=0;y<n;y++) for (let x=0;x<n;x++){
+        let s=h[x+y*n], c=1;
+        for (const [dx,dy] of DIRS8){ const nx=x+dx, ny=y+dy; if (nx>=0&&ny>=0&&nx<n&&ny<n){ s+=h[nx+ny*n]; c++; } }
+        h2[x+y*n] = s/c;
+      }
+      h = h2;
+    }
+    const c0 = (n-1)/2;
+    const v = h.map((val,i) => { const x=i%n, y=i/n|0; const d = Math.max(Math.abs(x-c0),Math.abs(y-c0))/c0; return val - Math.pow(d,3)*0.3; });
+    const thr = [...v].sort((a,b)=>a-b)[Math.floor(n*n*0.36)];
+    const tiles = v.map((val,i) => ({x:i%n, y:i/n|0, t: val<thr?'water':'plains', res:null, imp:null, terr:-1, city:0, village:false, ruin:false, shrine:false}));
+    for (const t of tiles) if (t.t !== 'water'){ const r = Math.random(); t.t = r<.13 ? 'mountain' : r<.43 ? 'forest' : 'plains'; }
+    // largest landmass
+    const comp = new Int32Array(n*n).fill(-1); let bestC=-1, bestSize=0, ci=0;
+    for (let i=0;i<n*n;i++){
+      if (tiles[i].t==='water' || comp[i]>=0) continue;
+      const st=[i]; comp[i]=ci; let size=0;
+      while (st.length){ const j=st.pop(); size++; const x=j%n, y=j/n|0;
+        for (const [dx,dy] of DIRS8){ const nx=x+dx, ny=y+dy; if (nx<0||ny<0||nx>=n||ny>=n) continue; const k=nx+ny*n;
+          if (tiles[k].t!=='water' && comp[k]<0){ comp[k]=ci; st.push(k); } } }
+      if (size>bestSize){ bestSize=size; bestC=ci; } ci++;
+    }
+    if (bestSize < n*n*0.38) continue;
+    const main = tiles.filter((t,i) => comp[i]===bestC && t.x>0 && t.y>0 && t.x<n-1 && t.y<n-1);
+    const caps = [main[Math.random()*main.length|0]];
+    while (caps.length < np){
+      let best=null, bd=-1;
+      for (const t of main){ const d = Math.min(...caps.map(c => cheb(c.x,c.y,t.x,t.y))) + Math.random()*.5; if (d>bd){ bd=d; best=t; } }
+      caps.push(best);
+    }
+    if (np>1 && Math.min(...caps.flatMap((a,i) => caps.slice(i+1).map(b => cheb(a.x,a.y,b.x,b.y)))) < 4) continue;
+    for (const c of caps){
+      c.t='plains'; c.res=null;
+      for (const [dx,dy] of DIRS8){ const nx=c.x+dx, ny=c.y+dy; const t=tiles[nx+ny*n];
+        if (Math.random()<.55){ t.res = t.t==='plains'?'fruit': t.t==='forest'?'game': t.t==='mountain'?'ore':'fish'; } }
+    }
+    const nearCap = (t,d) => caps.some(c => cheb(c.x,c.y,t.x,t.y) < d);
+    const villages = [];
+    for (const t of shuffle(tiles.filter(t => t.t!=='water'))){
+      if (villages.length >= Math.round(n*n/15)) break;
+      if (nearCap(t,3) || villages.some(v => cheb(v.x,v.y,t.x,t.y) < 3)) continue;
+      t.village=true; t.t='plains'; t.res=null; villages.push(t);
+    }
+    for (const t of tiles){
+      if (t.village || caps.includes(t) || t.res) continue;
+      const r = Math.random();
+      if (t.t==='plains' && r<.2) t.res='fruit';
+      else if (t.t==='forest' && r<.28) t.res='game';
+      else if (t.t==='mountain' && r<.32) t.res='ore';
+      else if (t.t==='water' && r<.3 && DIRS8.some(([dx,dy]) => { const nx=t.x+dx, ny=t.y+dy; return nx>=0&&ny>=0&&nx<n&&ny<n && tiles[nx+ny*n].t!=='water'; })) t.res='fish';
+    }
+    let ruins = 0;
+    for (const t of shuffle(tiles.filter(t => t.t!=='water' && !t.village && !t.res && !caps.includes(t)))){
+      if (ruins >= (n>=14?4:3)) break; if (nearCap(t,3)) continue; t.ruin=true; ruins++;
+    }
+    let sh=null, sd=1e9;
+    for (const t of tiles){ if (t.t==='water'||t.village||t.ruin||caps.includes(t)) continue; const d=Math.hypot(t.x-c0,t.y-c0); if (d<sd){ sd=d; sh=t; } }
+    if (sh){ sh.shrine=true; sh.t='plains'; sh.res=null; }
+    return {tiles, caps};
+  }
+  return genMap(n, np);
+}
+
+/* ---------- core rules ---------- */
+function makeCity(x,y,owner,capital){
+  const c = {id:G.nextId++, x, y, owner, level:1, pop:0, workshop:0, walls:false, radius:1, capital, name:cityName()};
+  G.cities.push(c);
+  const t = tileAt(x,y); t.village=false; t.city=c.id; t.res=null; t.terr=c.id;
+  claim(c); return c;
+}
+function claim(c){
+  for (let dy=-c.radius; dy<=c.radius; dy++) for (let dx=-c.radius; dx<=c.radius; dx++){
+    const x=c.x+dx, y=c.y+dy; if (!inB(x,y)) continue; const t=tileAt(x,y);
+    if (t.terr<0) t.terr=c.id;
+  }
+  if (c.owner===0) reveal(c.x,c.y,c.radius+1);
+}
+function reveal(x,y,r){
+  const e = G.players[0].explored;
+  for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++){ if (inB(x+dx,y+dy)) e[(x+dx)+(y+dy)*G.n]=1; }
+}
+function spawnUnit(type, owner, x, y, fresh){
+  const d = G.rules.units.find(u => u.id===type) || G.rules.units[0];
+  const u = {id:G.nextId++, type:d.id, owner, x, y, dx:x, dy:y, hp:d.hp, moved:fresh, attacked:fresh, rested:false};
+  G.units.push(u); if (owner===0) reveal(x,y,1); return u;
+}
+const income = p => citiesOf(p.id).reduce((s,c) => s + c.level + c.workshop + (c.capital?1:0), 0) + (hasTech(p,'trade') ? citiesOf(p.id).length : 0);
+const unitCap = pid => citiesOf(pid).reduce((s,c) => s + c.level + 1, 0);
+const techCost = (p,id) => 2 + TECHS[id].tier*3 + citiesOf(p.id).length;
+const techAvailable = (p,id) => !p.techs.includes(id) && (!TECHS[id].req || p.techs.includes(TECHS[id].req));
+function score(p){
+  let s = 0;
+  for (const c of citiesOf(p.id)) s += 40 + c.level*50;
+  s += (p.techs.length-1)*30 + unitsOf(p.id).length*8;
+  if (p.id===0) s += G.players[0].explored.reduce((a,b)=>a+b,0)*2;
+  else s += G.tiles.filter(t => terrOwner(t)===p.id).length*4;
+  return s;
+}
+function passable(u,x,y){
+  const t=tileAt(x,y), d=U(u), p=G.players[u.owner];
+  if (t.t==='water') return has(d,'swim') || hasTech(p,'sailing');
+  if (t.t==='mountain') return has(d,'climb') || has(d,'pathfinder') || hasTech(p,'climbing');
+  return true;
+}
+const adjEnemy = (x,y,pid) => G.units.some(o => o.owner!==pid && cheb(o.x,o.y,x,y)<=1);
+function reach(u){
+  const d=U(u), n=G.n, res=new Set(), best=new Map([[u.x+u.y*n, d.move]]);
+  const q=[[u.x,u.y,d.move]];
+  while (q.length){
+    const [x,y,m] = q.shift();
+    for (const [dx,dy] of DIRS8){
+      const nx=x+dx, ny=y+dy; if (!inB(nx,ny) || !passable(u,nx,ny)) continue;
+      const o = unitAt(nx,ny); if (o && o.owner!==u.owner) continue;
+      const t = tileAt(nx,ny); let r = m-1;
+      if ((t.t==='forest'||t.t==='mountain') && !has(d,'pathfinder')) r = 0;
+      if (adjEnemy(nx,ny,u.owner)) r = 0;
+      const i = nx+ny*n; if (best.has(i) && best.get(i) >= r) continue;
+      best.set(i,r); if (!o) res.add(i); if (r>0) q.push([nx,ny,r]);
+    }
+  }
+  return res;
+}
+const canMove = u => !u.moved && !u.attacked;
+const canAttack = u => !u.attacked && U(u).atk>0 && (!u.moved || has(U(u),'dash'));
+function targets(u){
+  if (!canAttack(u)) return [];
+  const r = U(u).range;
+  return G.units.filter(o => o.owner!==u.owner && cheb(o.x,o.y,u.x,u.y)<=r && (u.owner!==0 || explored(o.x,o.y)));
+}
+function defBonus(u){
+  const t=tileAt(u.x,u.y), c=cityAt(u.x,u.y); let b=1;
+  if (c && c.owner===u.owner) b = c.walls ? 2.5 : 1.5;
+  else if (t.t==='mountain') b = 1.5;
+  else if (t.t==='forest') b = 1.25;
+  if (has(U(u),'stalwart')) b *= 1.5;
+  return b;
+}
+function forecast(a,d){
+  const A=U(a), D=U(d);
+  const af = A.atk*(a.hp/A.hp), df = D.def*(d.hp/D.hp)*defBonus(d), tot = af+df || 1;
+  const dmg = Math.round(af/tot*A.atk*4.5);
+  const ret = (d.hp-dmg>0 && cheb(a.x,a.y,d.x,d.y)<=D.range && D.atk>0) ? Math.round(df/tot*D.def*4.5) : 0;
+  return {dmg, ret};
+}
+function attack(a,d){
+  const {dmg, ret} = forecast(a,d);
+  const A=U(a);
+  d.hp -= dmg; fx(d.x,d.y,'-'+dmg,'#ff8a7a');
+  a.attacked = true; a.moved = true; a.rested = false;
+  if (d.hp <= 0){
+    killUnit(d, a.owner);
+    if (A.range===1 && passable(a,d.x,d.y) && !unitAt(d.x,d.y)){ a.x=d.x; a.y=d.y; if (a.owner===0) reveal(a.x,a.y,1); }
+  } else if (ret>0){
+    a.hp -= ret; fx(a.x,a.y,'-'+ret,'#ff8a7a');
+    if (a.hp <= 0) killUnit(a, d.owner);
+  }
+}
+function killUnit(u, by){
+  G.units = G.units.filter(x => x !== u);
+  if (u.owner===0) toast(`Your ${U(u).name} fell.`);
+  else if (by===0) G.players[0].kills++;
+}
+function capturable(u){ const t=tileAt(u.x,u.y); if (t.village) return true; const c=cityAt(u.x,u.y); return !!(c && c.owner!==u.owner); }
+const canCapture = u => capturable(u) && !u.moved && !u.attacked;
+function capture(u){
+  const t = tileAt(u.x,u.y); const p = G.players[u.owner]; let c;
+  if (t.village){ c = makeCity(u.x,u.y,u.owner,false); }
+  else {
+    c = cityAt(u.x,u.y); const prev = c.owner; c.owner = u.owner; c.capital = false;
+    if (prev===0) toast(`${p.name} captured ${c.name}!`);
+    if (u.owner===0) claim(c);
+    checkElim(prev);
+  }
+  if (u.owner===0) toast(`${c.name} joins the ${p.name}.`);
+  u.moved = u.attacked = true; u.rested = false;
+}
+function checkElim(pid){
+  const p = G.players[pid];
+  if (!p.alive || citiesOf(pid).length) return;
+  p.alive = false; G.units = G.units.filter(u => u.owner!==pid);
+  if (pid===0){ G.over = {win:false, reason:'Your last city fell.'}; }
+  else toast(`The ${p.name} have been defeated.`);
+}
+function moveUnit(u,x,y){
+  u.x=x; u.y=y; u.moved=true; u.rested=false;
+  const t = tileAt(x,y);
+  if (u.owner===0) reveal(x,y, t.t==='mountain'?2:1);
+  if (t.ruin){
+    t.ruin=false; const p=G.players[u.owner];
+    const av = Object.keys(TECHS).filter(id => techAvailable(p,id));
+    if (av.length && Math.random()<.4){ const id=av[Math.random()*av.length|0]; p.techs.push(id); if (u.owner===0) toast(`The ruins held old knowledge: ${TECHS[id].name}!`); }
+    else { p.stars += 8; if (u.owner===0){ toast('The ruins held a cache: +8 stars!'); fx(x,y,'+8★','#ffc53d'); } }
+  }
+}
+function doHeal(u){
+  for (const a of G.units){ if (a.owner===u.owner && a!==u && cheb(a.x,a.y,u.x,u.y)<=1 && a.hp<U(a).hp){ const h=Math.min(4,U(a).hp-a.hp); a.hp+=h; fx(a.x,a.y,'+'+h,'#86dc9b'); } }
+  u.moved = u.attacked = true; u.rested = false;
+}
+function trainBlock(p,c,d){
+  if (!hasTech(p,d.tech)) return 'Needs ' + TECHS[d.tech].name;
+  if (unitAt(c.x,c.y)) return 'City tile is occupied';
+  if (unitsOf(p.id).length >= unitCap(p.id)) return 'Unit limit reached';
+  if (p.stars < d.cost) return 'Not enough stars';
+  return '';
+}
+function train(p,c,d){ p.stars -= d.cost; spawnUnit(d.id,p.id,c.x,c.y,true); }
+function harvestOpt(p,x,y){
+  const t=tileAt(x,y); if (terrOwner(t)!==p.id) return null;
+  if (t.res) return {...HARV[t.res], kind:t.res};
+  if (t.t==='plains' && !t.imp && !t.city && !t.village && !t.ruin && !t.shrine && hasTech(p,'farming')) return {...FARM, kind:'farm'};
+  return null;
+}
+function doHarvest(p,x,y){
+  const o = harvestOpt(p,x,y); if (!o || !hasTech(p,o.tech) || p.stars<o.cost) return;
+  const t = tileAt(x,y); p.stars -= o.cost;
+  if (o.kind==='ore'){ t.res=null; t.imp='mine'; } else if (o.kind==='farm') t.imp='farm'; else t.res=null;
+  fx(x,y,'+'+o.pop+' pop','#ffe28a');
+  addPop(cityById(t.terr), o.pop, p);
+}
+function addPop(c, n, p){
+  c.pop += n;
+  while (c.pop >= c.level+1){
+    c.pop -= c.level+1; c.level++;
+    const opts = rewardOptions(c);
+    if (p.ai) applyReward(c, opts[Math.random()<.5?0:1], p);
+    else G.pending.push({city:c.id, opts, level:c.level});
+  }
+}
+function rewardOptions(c){
+  const m = {2:['workshop','stash'], 3:[c.radius<2?'borders':'workshop','walls'], 4:['recruit','stash']};
+  return m[c.level] || ['workshop','recruit'];
+}
+function applyReward(c, kind, p){
+  if (kind==='workshop') c.workshop++;
+  else if (kind==='walls') c.walls = true;
+  else if (kind==='stash') p.stars += 5;
+  else if (kind==='borders'){ c.radius = 2; claim(c); }
+  else if (kind==='recruit'){
+    const known = G.rules.units.filter(d => hasTech(p,d.tech)).sort((a,b) => power(b)-power(a));
+    const spots = [[c.x,c.y], ...DIRS8.map(([dx,dy]) => [c.x+dx,c.y+dy])];
+    const d = known[0]; let placed = false;
+    if (d) for (const [x,y] of spots){ if (inB(x,y) && !unitAt(x,y) && passable({owner:p.id,type:d.id},x,y)){ spawnUnit(d.id,p.id,x,y,true); placed=true; break; } }
+    if (!placed) p.stars += 5;
+  }
+}
+
+/* ---------- turns ---------- */
+function beginTurn(p){
+  if (p.started) p.stars += income(p);
+  p.started = true;
+  for (const u of unitsOf(p.id)){
+    if (u.rested && u.hp < U(u).hp){ const h = Math.min(terrOwner(tileAt(u.x,u.y))===p.id ? 4 : 2, U(u).hp-u.hp); u.hp += h; if (p.id===0) fx(u.x,u.y,'+'+h,'#86dc9b'); }
+    u.moved = u.attacked = false; u.rested = true;
+  }
+  const s = G.tiles.find(t => t.shrine); const su = s && unitAt(s.x,s.y);
+  p.shrineHold = (su && su.owner===p.id) ? p.shrineHold+1 : 0;
+}
+function endTurn(){
+  if (!G || G.over || G.pending.length) return;
+  sel = null;
+  for (const p of G.players){ if (p.ai && p.alive && !G.over){ beginTurn(p); aiAct(p); } }
+  if (!G.over){ G.turn++; beginTurn(me()); }
+  afterAction();
+}
+
+/* ---------- AI ---------- */
+function aiAct(p){
+  for (const u of unitsOf(p.id)){ if (G.units.includes(u) && !G.over) aiUnit(u); }
+  if (!G.over) aiEconomy(p);
+}
+function aiPickTarget(u){
+  const ts = targets(u); if (!ts.length) return null;
+  return ts.map(t => ({t, f:forecast(u,t)})).sort((a,b) => ((b.f.dmg>=b.t.hp)-(a.f.dmg>=a.t.hp)) || (a.t.hp-b.t.hp))[0].t;
+}
+function aiGoal(u){
+  let best=null, bd=1e9;
+  for (const t of G.tiles){
+    let d;
+    if (t.village) d = cheb(u.x,u.y,t.x,t.y);
+    else if (t.city && cityById(t.city).owner!==u.owner) d = cheb(u.x,u.y,t.x,t.y) - .5;
+    else if (t.shrine && G.rules.objectives.some(o => o.type==='shrine')) d = cheb(u.x,u.y,t.x,t.y) + 2;
+    else continue;
+    if (d < bd){ bd=d; best=[t.x,t.y]; }
+  }
+  for (const o of G.units){ if (o.owner===u.owner) continue; const d = cheb(u.x,u.y,o.x,o.y)+1; if (d<bd){ bd=d; best=[o.x,o.y]; } }
+  return best;
+}
+function aiUnit(u){
+  const d = U(u);
+  if (canCapture(u)){ capture(u); return; }
+  if (has(d,'heal') && G.units.some(a => a.owner===u.owner && a!==u && cheb(a.x,a.y,u.x,u.y)<=1 && a.hp<U(a).hp)){ doHeal(u); return; }
+  let tg = aiPickTarget(u); if (tg){ attack(u,tg); return; }
+  if (u.hp < d.hp*.35 && terrOwner(tileAt(u.x,u.y))===u.owner) return;
+  if (!canMove(u)) return;
+  const goal = aiGoal(u); if (!goal) return;
+  let best=[u.x,u.y], bd=cheb(u.x,u.y,goal[0],goal[1]);
+  for (const i of reach(u)){ const x=i%G.n, y=i/G.n|0; const dd = cheb(x,y,goal[0],goal[1]) + Math.random()*.3; if (dd<bd){ bd=dd; best=[x,y]; } }
+  if (best[0]!==u.x || best[1]!==u.y) moveUnit(u,best[0],best[1]);
+  tg = aiPickTarget(u); if (tg) attack(u,tg);
+}
+function aiEconomy(p){
+  for (const step of shuffle(['grow','train','research'])){
+    if (step==='grow'){
+      for (const t of G.tiles){ if (terrOwner(t)!==p.id) continue; const o = harvestOpt(p,t.x,t.y); if (o && hasTech(p,o.tech) && p.stars >= o.cost+1) doHarvest(p,t.x,t.y); }
+    } else if (step==='train'){
+      for (const c of citiesOf(p.id)){
+        if (unitsOf(p.id).length >= citiesOf(p.id).length*2+1) break;
+        const opts = G.rules.units.filter(d => !trainBlock(p,c,d)).sort((a,b) => power(b)-power(a));
+        if (opts.length) train(p,c,opts[Math.random()<.7 ? 0 : Math.min(1,opts.length-1)]);
+      }
+    } else {
+      const av = Object.keys(TECHS).filter(id => techAvailable(p,id)).sort((a,b) => techCost(p,a)-techCost(p,b));
+      const useful = av.filter(id => G.rules.units.some(d => d.tech===id) || G.tiles.some(t => terrOwner(t)===p.id && t.res && HARV[t.res].tech===id));
+      const id = (useful.length && Math.random()<.75) ? useful[0] : av[0];
+      if (id && p.stars >= techCost(p,id) && Math.random()<.7){ p.stars -= techCost(p,id); p.techs.push(id); }
+    }
+  }
+}
+
+/* ---------- objectives ---------- */
+function rulesObjectives(){ return G.rules.objectives.length ? G.rules.objectives : [{title:'',type:'eliminate',n:1,unit:''}]; }
+function progress(o,p){
+  const n = o.n;
+  switch (o.type){
+    case 'conquer': return {cur:citiesOf(p.id).length, target:n};
+    case 'level': return {cur:Math.max(0,...citiesOf(p.id).map(c => c.level)), target:n};
+    case 'research': return {cur:p.techs.length-1, target:n};
+    case 'army': return {cur:unitsOf(p.id).filter(u => u.type===o.unit).length, target:n};
+    case 'shrine': return {cur:p.shrineHold, target:n};
+    case 'score': return {cur:score(p), target:n};
+    case 'eliminate': { const r = G.players.filter(q => q.id!==p.id); return {cur:r.filter(q => !q.alive).length, target:r.length}; }
+    case 'survive': return {cur:G.turn, target:n};
+    case 'stars': return {cur:p.stars, target:n};
+  }
+  return {cur:0, target:1};
+}
+function checkObjectives(){
+  if (!G || G.over) return;
+  const objs = rulesObjectives();
+  objs.forEach((o,i) => { const pr = progress(o,me()); if (pr.cur >= pr.target) G.objDone[i] = true; });
+  const done = G.rules.scenario.mode==='all' ? objs.every((o,i) => G.objDone[i]) : objs.some((o,i) => G.objDone[i]);
+  if (done) G.over = {win:true, reason:G.rules.scenario.mode==='all' ? 'Every objective is complete.' : 'You completed an objective.'};
+  else if (G.rules.scenario.turnLimit && G.turn > G.rules.scenario.turnLimit) G.over = {win:false, reason:`Turn ${G.rules.scenario.turnLimit} has passed.`};
+}
+
+/* ---------- new game ---------- */
+function startGame(){
+  const rules = clone(config), n = rules.settings.size, np = rules.settings.rivals + 1;
+  G = {n, rules, tiles:[], cities:[], units:[], players:[], turn:1, nextId:1, over:null, pending:[], objDone:[], endShown:false};
+  const m = genMap(n, np); G.tiles = m.tiles;
+  for (let i=0;i<np;i++) G.players.push({id:i, name:i===0 ? rules.scenario.tribe : RIVAL_NAMES[i-1], color:PLAYER_COLORS[i], stars:5, techs:['foraging'], alive:true, ai:i>0, explored:new Array(n*n).fill(0), shrineHold:0, kills:0, started:false});
+  m.caps.forEach((c,i) => { makeCity(c.x,c.y,i,true); spawnUnit(starterDef().id, i, c.x, c.y, false); });
+  reveal(m.caps[0].x, m.caps[0].y, 2);
+  sel = null; FX.length = 0;
+  beginTurn(me());
+  centerOn(m.caps[0].x, m.caps[0].y);
+  checkObjectives();
+  refresh();
+  saveGame();
+}
+
+/* ---------- UI ---------- */
+function toast(msg){
+  const el = document.createElement('div'); el.className='t-msg'; el.textContent=msg;
+  const box = $('#toast'); box.appendChild(el); while (box.children.length>3) box.firstChild.remove();
+  setTimeout(() => el.remove(), 3200);
+}
+function fx(x,y,text,color){ FX.push({x,y,text,color,t0:performance.now()}); }
+function afterAction(){
+  checkObjectives();
+  refresh();
+  saveGame();
+  if (G.pending.length) showLevelUp();
+  else if (G.over && !G.endShown){ G.endShown = true; showEnd(); }
+}
+function refresh(){
+  const p = me();
+  $('#hStars').innerHTML = `<span class="star">★</span>${p.stars} <small>+${income(p)}</small>`;
+  const lim = G.rules.scenario.turnLimit;
+  $('#hTurn').innerHTML = `Turn ${G.turn}${lim ? ` <small>/ ${lim}</small>` : ''}`;
+  $('#hScore').innerHTML = `${score(p)} <small>pts</small>`;
+  $('#endTurn').disabled = !!G.over;
+  // selection caches
+  selReach = new Set(); selTargets = [];
+  if (sel && sel.kind==='unit'){
+    const u = G.units.find(x => x.id===sel.id);
+    if (!u) sel = null;
+    else if (u.owner===0 && !G.over){ if (canMove(u)) selReach = reach(u); selTargets = targets(u); }
+  }
+  renderPanel();
+}
+function tokHTML(d, color){ return `<span class="tok" style="--c:${color}">${esc(d.glyph)}</span>`; }
+function renderPanel(){
+  const el = $('#panel'); const p = me();
+  if (G.over){
+    el.innerHTML = `<div class="p-head"><div><b>${G.over.win ? 'Victory' : 'Defeat'}</b><small>${esc(G.over.reason)}</small></div></div><div class="acts"><button class="btn gold" data-act="new">New game</button><button class="btn" data-act="work">Workshop</button></div>`;
+    return;
+  }
+  if (!sel){
+    const idle = unitsOf(0).filter(u => canMove(u) || targets(u).length || canCapture(u)).length;
+    el.innerHTML = `<p class="hint"><b style="color:var(--ink)">${esc(p.name)}</b> · ${idle ? `${idle} unit${idle>1?'s':''} ready to act.` : 'All units have acted.'} Tap a unit or city. Drag to look around.</p>`;
+    return;
+  }
+  if (sel.kind==='unit'){
+    const u = G.units.find(x => x.id===sel.id); const d = U(u); const owner = G.players[u.owner];
+    let hint = '', acts = '';
+    if (u.owner===0){
+      if (canCapture(u)) acts += `<button class="btn gold" data-act="capture">Capture ${tileAt(u.x,u.y).village ? 'village' : esc(cityAt(u.x,u.y).name)}</button>`;
+      if (has(d,'heal') && !u.moved && !u.attacked) acts += `<button class="btn" data-act="heal">Mend allies</button>`;
+      if (cityAt(u.x,u.y) && cityAt(u.x,u.y).owner===0) acts += `<button class="btn" data-act="tile">View city</button>`;
+      if (capturable(u) && !canCapture(u) && !u.attacked) hint = 'Stay here: you can capture next turn.';
+      else if (selReach.size || selTargets.length) hint = (selReach.size ? 'Tap a dot to move' : '') + (selReach.size && selTargets.length ? ', or a ' : selTargets.length ? 'Tap a ' : '') + (selTargets.length ? 'red tile to attack' : '') + '.';
+      else if (!acts) hint = 'Done for this turn.';
+    } else hint = `Belongs to the ${owner.name}.`;
+    el.innerHTML = `<div class="p-head">${tokHTML(d, owner.color)}<div><b>${esc(d.name)}</b><small>${esc(owner.name)}</small></div><span class="right">${u.hp}/${d.hp} HP</span></div>
+      <div class="stats"><span class="stat"><span>Atk</span>${d.atk}</span><span class="stat"><span>Def</span>${d.def}</span><span class="stat"><span>Move</span>${d.move}</span><span class="stat"><span>Range</span>${d.range}</span></div>
+      ${d.skills.length ? `<div class="chips">${d.skills.map(s => `<span class="chip" title="${esc(SKILLS[s].desc)}">${SKILLS[s].name}</span>`).join('')}</div>` : ''}
+      ${acts ? `<div class="acts">${acts}</div>` : ''}${hint ? `<p class="hint">${esc(hint)}</p>` : ''}`;
+    return;
+  }
+  // tile
+  const {x,y} = sel; const t = tileAt(x,y); const c = cityAt(x,y);
+  if (c){
+    const owner = G.players[c.owner]; const mine = c.owner===0;
+    const pips = Array.from({length:c.level+1}, (_,i) => `<i class="${i<c.pop?'on':''}"></i>`).join('');
+    let html = `<div class="p-head"><span class="tok" style="--c:${owner.color}">${c.capital ? '♛' : c.level}</span><div><b>${esc(c.name)}</b><small>${esc(owner.name)} · level ${c.level}${c.capital ? ' · capital' : ''}</small></div><span class="right">+${c.level + c.workshop + (c.capital?1:0)}★</span></div>
+      <div class="stats"><span class="stat"><span>Growth</span><span class="pips">${pips}</span></span>${c.walls ? '<span class="stat">Walls</span>' : ''}${c.workshop ? `<span class="stat">Workshop ×${c.workshop}</span>` : ''}</div>`;
+    if (mine){
+      html += `<p class="hint">Train a unit · ${unitsOf(0).length}/${unitCap(0)} units</p><div class="train">` + G.rules.units.map((d,i) => {
+        const why = trainBlock(p,c,d);
+        return `<button class="btn" data-act="train" data-i="${i}" ${why ? 'disabled' : ''} title="${esc(why || 'Train ' + d.name)}">${tokHTML(d, owner.color)}<span>${esc(d.name)}<small>${why && !hasTech(p,d.tech) ? esc(why) : d.cost + '★'}</small></span></button>`;
+      }).join('') + `</div>`;
+      const ux = unitAt(x,y); if (ux && ux.owner===0) html += `<div class="acts"><button class="btn" data-act="unit">Select ${esc(U(ux).name)}</button></div>`;
+    }
+    el.innerHTML = html; return;
+  }
+  const own = terrOwner(t);
+  let name = t.village ? 'Village' : t.shrine ? 'The Shrine' : t.ruin ? 'Ruins' : TERRAIN_NAME[t.t];
+  const bits = [];
+  if (t.t==='water') bits.push(isShallow(x,y) ? 'Shallows' : 'Open sea');
+  else if (t.village || t.shrine || t.ruin) bits.push(TERRAIN_NAME[t.t]);
+  if (t.res) bits.push(RES_NAME[t.res]);
+  if (t.imp) bits.push(t.imp==='farm' ? 'Farm' : 'Mine');
+  if (own>=0) bits.push(`${G.players[own].name} land`);
+  let html = `<div class="p-head"><div><b>${esc(name)}</b><small>${esc(bits.join(' · '))}</small></div></div>`;
+  let hint = '';
+  if (t.village) hint = 'Move a unit here, then capture it on your next turn to found a city.';
+  else if (t.shrine) hint = G.rules.objectives.some(o => o.type==='shrine') ? `Keep a unit here to hold it. You’ve held it ${p.shrineHold} turn${p.shrineHold===1?'':'s'} in a row.` : 'An ancient shrine. Some scenarios ask you to hold it.';
+  else if (t.ruin) hint = 'Move a unit onto the ruins to search them.';
+  else if (t.t==='water' && !hasTech(p,'sailing')) hint = 'Research Sailing to cross water.';
+  else if (t.t==='mountain' && !hasTech(p,'climbing')) hint = 'Research Climbing to enter mountains.';
+  const o = harvestOpt(p,x,y);
+  if (o){
+    const why = !hasTech(p,o.tech) ? 'Needs ' + TECHS[o.tech].name : p.stars < o.cost ? 'Not enough stars' : '';
+    html += `<div class="acts"><button class="btn gold" data-act="harvest" ${why?'disabled':''}>${o.label} · ${o.cost}★ <small>(+${o.pop} pop)</small></button></div>`;
+    if (why) hint = why + '.';
+  } else if (t.res && own!==0) hint = hint || 'Resources can be harvested inside your borders.';
+  const ux = unitAt(x,y);
+  if (ux && explored(x,y)) html += `<div class="acts"><button class="btn" data-act="unit">Select ${esc(U(ux).name)}</button></div>`;
+  if (hint) html += `<p class="hint">${esc(hint)}</p>`;
+  el.innerHTML = html;
+}
+$('#panel').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || !G) return;
+  const act = b.dataset.act, p = me();
+  if (act==='new') return showNewGame();
+  if (act==='work') return showWorkshop();
+  if (G.over) return;
+  if (act==='capture'){ const u = G.units.find(x => x.id===sel.id); if (u && canCapture(u)) capture(u); }
+  else if (act==='heal'){ const u = G.units.find(x => x.id===sel.id); if (u) doHeal(u); }
+  else if (act==='tile'){ const u = G.units.find(x => x.id===sel.id); sel = {kind:'tile', x:u.x, y:u.y}; }
+  else if (act==='unit'){ const u = unitAt(sel.x, sel.y); if (u) sel = {kind:'unit', id:u.id}; }
+  else if (act==='train'){ const c = cityAt(sel.x, sel.y); const d = G.rules.units[+b.dataset.i]; if (c && d && !trainBlock(p,c,d)) train(p,c,d); }
+  else if (act==='harvest'){ doHarvest(p, sel.x, sel.y); }
+  afterAction();
+});
+
+function tapTile(x,y){
+  if (!G) return;
+  if (!inB(x,y)){ sel = null; refresh(); return; }
+  if (G.over){ sel = {kind:'tile',x,y}; refresh(); return; }
+  const u = unitAt(x,y);
+  if (sel && sel.kind==='unit'){
+    const su = G.units.find(v => v.id===sel.id);
+    if (su && su.owner===0){
+      const tg = selTargets.find(t => t.x===x && t.y===y);
+      if (tg){ attack(su,tg); if (!G.units.includes(su)) sel = null; afterAction(); return; }
+      if (selReach.has(x + y*G.n)){ moveUnit(su,x,y); afterAction(); return; }
+    }
+    if (u && su && u.id===su.id){ sel = {kind:'tile',x,y}; refresh(); return; }
+  }
+  if (u && explored(x,y)) sel = {kind:'unit', id:u.id};
+  else if (explored(x,y)) sel = {kind:'tile', x, y};
+  else sel = null;
+  refresh();
+}
+
+/* ---------- modals ---------- */
+const modal = $('#modal');
+let modalLocked = false;
+function openModal(html, locked=false){ modal.innerHTML = `<div class="card" role="dialog" aria-modal="true">${html}</div>`; modal.hidden = false; modalLocked = locked; const f = modal.querySelector('button, input, select'); if (f) f.focus({preventScroll:true}); }
+function closeModal(){ modal.hidden = true; modal.innerHTML = ''; modalLocked = false; }
+modal.addEventListener('click', e => { if (e.target===modal && !modalLocked) closeModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape'){ if (!modal.hidden && !modalLocked) closeModal(); else if (modal.hidden && sel){ sel=null; refresh(); } }
+});
+const closeBtn = `<button class="btn ghost x" data-m="close" aria-label="Close">✕</button>`;
+
+function objectivesHTML(){
+  const objs = rulesObjectives();
+  return `<div class="objs">${objs.map((o,i) => {
+    const pr = progress(o,me()); const done = G.objDone[i];
+    const pct = done ? 100 : clamp(pr.cur/pr.target*100,0,100);
+    const main = o.title || OBJ[o.type].fmt(o); const sub = o.title ? OBJ[o.type].fmt(o) : '';
+    return `<div class="obj ${done?'done':''}"><div class="top"><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}<span class="num">${done ? 'Done' : `${Math.min(pr.cur,pr.target)} / ${pr.target}`}</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  }).join('')}</div>`;
+}
+function rulesLine(){
+  const s = G.rules.scenario; const objs = rulesObjectives();
+  return `${objs.length>1 ? (s.mode==='all' ? 'Complete every objective' : 'Complete any one objective') : 'Complete the objective'}${s.turnLimit ? ` by the end of turn ${s.turnLimit}` : ''}. Lose every city and the game is over.`;
+}
+function showIntro(){
+  openModal(`<div class="card-top"><div><div class="eyebrow">Scenario</div><h2>${esc(G.rules.scenario.name)}</h2></div></div>
+    <p>You lead the <b>${esc(me().name)}</b> against ${G.players.length-1} rival tribe${G.players.length>2?'s':''}. ${esc(rulesLine())}</p>
+    ${objectivesHTML()}
+    <p class="hint">Stars (★) come from your cities each turn. Spend them on units, research and harvesting resources inside your borders. Harvesting grows a city; every level brings a reward.</p>
+    <div class="row"><button class="btn gold" data-m="close">Begin</button><button class="btn" data-m="work">Make your own characters and goals</button></div>`);
+}
+function showGoals(){
+  openModal(`<div class="card-top"><div><div class="eyebrow">${esc(G.rules.scenario.name)}</div><h2>Goals</h2></div>${closeBtn}</div><p>${esc(rulesLine())}</p>${objectivesHTML()}
+    <div class="row"><button class="btn" data-m="work">Edit goals in the Workshop</button></div>`);
+}
+function showLevelUp(){
+  const pd = G.pending[0]; const c = cityById(pd.city);
+  openModal(`<div><div class="eyebrow">City grew</div><h2>${esc(c.name)} reached level ${pd.level}</h2></div><p>Choose a reward.</p>
+    <div class="reward">${pd.opts.map(k => `<button class="btn" data-reward="${k}"><b>${REWARDS[k][0]}</b><small>${REWARDS[k][1]}</small></button>`).join('')}</div>`, true);
+}
+function showEnd(){
+  const p = me(); const w = G.over.win;
+  openModal(`<div><div class="eyebrow">${esc(G.rules.scenario.name)} · turn ${G.turn}</div><h2>${w ? 'Victory!' : 'Defeat'}</h2></div><p>${esc(G.over.reason)}</p>
+    <div class="endstats"><span class="pill">${score(p)} <small>points</small></span><span class="pill">${citiesOf(0).length} <small>cities</small></span><span class="pill">${p.techs.length-1} <small>techs</small></span><span class="pill">${p.kills} <small>defeated</small></span></div>
+    ${objectivesHTML()}
+    <div class="row"><button class="btn gold" data-m="again">Play again on a new map</button><button class="btn" data-m="work">Open the Workshop</button><button class="btn ghost" data-m="close">Look at the map</button></div>`, true);
+}
+function showNewGame(){
+  const s = config.settings;
+  openModal(`<div class="card-top"><div><div class="eyebrow">${esc(config.scenario.name)}</div><h2>New game</h2></div>${closeBtn}</div>
+    <div class="form">
+      <div class="field"><label for="ng-r">Rival tribes</label><select id="ng-r">${[1,2,3].map(n => `<option ${n===s.rivals?'selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="field"><label for="ng-s">Map size</label><select id="ng-s">${[[12,'Small'],[14,'Medium'],[16,'Large']].map(([v,l]) => `<option value="${v}" ${v===s.size?'selected':''}>${l} (${v}×${v})</option>`).join('')}</select></div>
+    </div>
+    <p class="hint">Uses your current Workshop characters and goals.</p>
+    <div class="row"><button class="btn gold" data-m="start">Start</button><button class="btn" data-m="work">Workshop</button></div>`);
+}
+
+/* ---------- workshop ---------- */
+let wsTab = 'chars', wsSel = 0, wsResetArm = false;
+function showWorkshop(){ wsResetArm = false; renderWorkshop(); }
+function renderWorkshop(){
+  const tabs = [['chars','Characters'],['goals','Objectives'],['share','Save & share']];
+  let body = '';
+  if (wsTab==='chars'){
+    wsSel = clamp(wsSel, 0, config.units.length-1); const u = config.units[wsSel];
+    const noStarter = !config.units.some(d => !d.tech);
+    body = `<div class="ws"><div class="ws-list">${config.units.map((d,i) => `<button class="btn" data-ws="pick" data-i="${i}" aria-current="${i===wsSel}"><span class="tok" style="--c:${PLAYER_COLORS[0]}">${esc(d.glyph)}</span><span data-name="${i}">${esc(d.name)}</span></button>`).join('')}
+      ${config.units.length<16 ? `<button class="btn ghost" data-ws="add">+ New character</button>` : ''}</div>
+      <div style="display:grid;gap:12px;min-width:0">
+        <div class="form">
+          <div class="field" style="grid-column:span 2"><label for="w-name">Name</label><input id="w-name" data-f="name" maxlength="20" value="${esc(u.name)}"></div>
+          <div class="field"><label for="w-glyph">Symbol</label><input id="w-glyph" data-f="glyph" maxlength="4" value="${esc(u.glyph)}" title="Any letter, symbol or emoji"></div>
+          ${[['hp','Health',1,40],['atk','Attack',0,8],['def','Defense',0,8],['move','Move',1,4],['range','Range',1,3],['cost','Cost ★',1,20]].map(([f,l,a,b]) => `<div class="field"><label for="w-${f}">${l}</label><input id="w-${f}" type="number" inputmode="numeric" data-f="${f}" min="${a}" max="${b}" value="${u[f]}"></div>`).join('')}
+          <div class="field" style="grid-column:span 2"><label for="w-tech">Unlocked by</label><select id="w-tech" data-f="tech"><option value="">Available from the start</option>${Object.entries(TECHS).filter(([id]) => id!=='foraging').map(([id,t]) => `<option value="${id}" ${u.tech===id?'selected':''}>${t.name}</option>`).join('')}</select></div>
+        </div>
+        <div class="field"><span class="lbl">Abilities</span><div class="checks">${Object.entries(SKILLS).map(([id,s]) => `<label class="check"><input type="checkbox" data-skill="${id}" ${u.skills.includes(id)?'checked':''}> ${s.name} <small>${s.desc}</small></label>`).join('')}</div></div>
+        ${noStarter ? `<p class="warn">Give at least one character “Available from the start”. That one is every tribe’s first unit.</p>` : `<p class="hint">Every tribe starts with the first character that’s available from the start: <b>${esc(config.units.find(d => !d.tech).name)}</b>.</p>`}
+        <div class="row">${config.units.length>1 ? `<button class="btn danger" data-ws="del">Delete ${esc(u.name)}</button>` : ''}</div>
+      </div></div>`;
+  } else if (wsTab==='goals'){
+    const s = config.scenario;
+    body = `<div class="form">
+        <div class="field" style="grid-column:span 2"><label for="w-sname">Scenario name</label><input id="w-sname" data-s="name" maxlength="40" value="${esc(s.name)}"></div>
+        <div class="field" style="grid-column:span 2"><label for="w-tribe">Your tribe’s name</label><input id="w-tribe" data-s="tribe" maxlength="24" value="${esc(s.tribe)}"></div>
+        <div class="field" style="grid-column:span 2"><label for="w-mode">To win</label><select id="w-mode" data-s="mode"><option value="all" ${s.mode==='all'?'selected':''}>Complete every objective</option><option value="any" ${s.mode==='any'?'selected':''}>Complete any one objective</option></select></div>
+        <div class="field"><label for="w-limit">Turn limit</label><input id="w-limit" type="number" min="0" max="200" data-s="turnLimit" value="${s.turnLimit}" title="0 means no limit"></div>
+      </div>
+      <p class="hint">Turn limit 0 means no limit. With no objectives, you win by defeating every rival.</p>
+      <div class="objs">${config.objectives.map((o,i) => `<div class="orow">
+        <div class="field"><label for="o-t${i}">Title (optional)</label><input id="o-t${i}" data-o="title" data-i="${i}" maxlength="40" value="${esc(o.title)}" placeholder="${esc(OBJ[o.type].fmt({...o, unit:o.unit}))}"></div>
+        <div class="field"><label for="o-y${i}">Goal</label><select id="o-y${i}" data-o="type" data-i="${i}">${Object.entries(OBJ).map(([k,v]) => `<option value="${k}" ${o.type===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
+        <div class="field"><label for="o-n${i}">Amount</label><input id="o-n${i}" type="number" min="1" data-o="n" data-i="${i}" value="${o.n}" ${o.type==='eliminate'?'disabled':''}></div>
+        <div class="field">${o.type==='army' ? `<label for="o-u${i}">Character</label><select id="o-u${i}" data-o="unit" data-i="${i}">${config.units.map(d => `<option value="${esc(d.id)}" ${o.unit===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>` : ''}</div>
+        <button class="btn danger" data-ws="odel" data-i="${i}" aria-label="Remove objective">Remove</button>
+      </div>`).join('')}</div>
+      ${config.objectives.length<8 ? `<div class="row"><button class="btn" data-ws="oadd">+ Add objective</button></div>` : ''}`;
+  } else {
+    body = `<p>Your rules save in this browser automatically. To keep a copy or share it, copy the code below. To load someone else’s rules, paste their code and press Load.</p>
+      <div class="field"><label for="w-export">Your rules</label><textarea id="w-export" readonly>${esc(JSON.stringify(config))}</textarea></div>
+      <div class="row"><button class="btn" data-ws="copy">Copy code</button><span id="w-copied" class="hint"></span></div>
+      <div class="field"><label for="w-import">Paste rules</label><textarea id="w-import" placeholder='{"scenario":…}'></textarea></div>
+      <div class="row"><button class="btn" data-ws="import">Load pasted rules</button><button class="btn danger" data-ws="reset">${wsResetArm ? 'Tap again to reset everything' : 'Reset to the default rules'}</button></div>
+      <p id="w-msg" class="hint"></p>`;
+  }
+  openModal(`<div class="card-top"><div><div class="eyebrow">Workshop</div><h2>${esc(config.scenario.name)}</h2></div>${closeBtn}</div>
+    <div class="tabs" role="tablist">${tabs.map(([k,l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${wsTab===k}">${l}</button>`).join('')}</div>
+    ${body}
+    <div class="row" style="border-top:1px solid var(--line);padding-top:12px"><button class="btn gold" data-m="start">Start a new game with these rules</button><span class="hint">Changes apply to the next game you start.</span></div>`);
+}
+modal.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.f){
+    const u = config.units[wsSel]; const f = t.dataset.f;
+    if (f==='name'){ u.name = t.value.slice(0,20) || 'Unit'; const s = modal.querySelector(`[data-name="${wsSel}"]`); if (s) s.textContent = u.name; }
+    else if (f==='glyph'){ u.glyph = [...t.value].slice(0,2).join('') || '?'; const s = modal.querySelector(`[data-i="${wsSel}"] .tok`); if (s) s.textContent = u.glyph; }
+    else if (f!=='tech'){ const v = parseInt(t.value); if (!isNaN(v)) u[f] = clamp(v, +t.min, +t.max); }
+    saveConfig();
+  } else if (t.dataset.s){
+    const s = config.scenario, k = t.dataset.s;
+    if (k==='turnLimit'){ const v = parseInt(t.value); s.turnLimit = isNaN(v) ? 0 : clamp(v,0,200); }
+    else if (k!=='mode') s[k] = t.value.slice(0, k==='name'?40:24);
+    saveConfig();
+  } else if (t.dataset.o && t.dataset.o!=='type' && t.dataset.o!=='unit'){
+    const o = config.objectives[+t.dataset.i]; const k = t.dataset.o;
+    if (k==='n'){ const v = parseInt(t.value); if (!isNaN(v)) o.n = clamp(v,1,99999); } else o.title = t.value.slice(0,40);
+    saveConfig();
+  }
+});
+modal.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.f==='tech'){ config.units[wsSel].tech = t.value; saveConfig(); renderWorkshop(); }
+  else if (t.dataset.f && t.type==='number'){ const u = config.units[wsSel]; t.value = u[t.dataset.f]; }
+  else if (t.dataset.skill){ const u = config.units[wsSel]; u.skills = u.skills.filter(s => s!==t.dataset.skill); if (t.checked) u.skills.push(t.dataset.skill); saveConfig(); }
+  else if (t.dataset.s==='mode'){ config.scenario.mode = t.value; saveConfig(); }
+  else if (t.dataset.s==='name' || t.dataset.s==='tribe'){ if (!t.value.trim()){ config.scenario[t.dataset.s] = DEFAULT_CONFIG.scenario[t.dataset.s]; saveConfig(); renderWorkshop(); } }
+  else if (t.dataset.o==='type'){ const o = config.objectives[+t.dataset.i]; o.type = t.value; o.n = OBJ[t.value].n; if (t.value==='army') o.unit = config.units[0].id; saveConfig(); renderWorkshop(); }
+  else if (t.dataset.o==='unit'){ config.objectives[+t.dataset.i].unit = t.value; saveConfig(); }
+});
+modal.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.tab){ wsTab = b.dataset.tab; wsResetArm = false; renderWorkshop(); return; }
+  if (b.dataset.reward && G){ const pd = G.pending.shift(); applyReward(cityById(pd.city), b.dataset.reward, me()); closeModal(); afterAction(); return; }
+  const m = b.dataset.m, w = b.dataset.ws;
+  if (m==='close'){ closeModal(); return; }
+  if (m==='work'){ showWorkshop(); return; }
+  if (m==='again'){ closeModal(); startGame(); return; }
+  if (m==='start'){
+    const r = modal.querySelector('#ng-r'), s = modal.querySelector('#ng-s');
+    if (r){ config.settings.rivals = +r.value; config.settings.size = +s.value; }
+    config = normalizeConfig(config); saveConfig(); closeModal(); startGame(); showIntro(); return;
+  }
+  if (!w) return;
+  if (w==='pick'){ wsSel = +b.dataset.i; renderWorkshop(); }
+  else if (w==='add'){ config.units.push({id:'c'+Date.now().toString(36), name:'New hero', glyph:'✦', hp:12, atk:2, def:2, move:1, range:1, cost:4, tech:'', skills:[]}); wsSel = config.units.length-1; saveConfig(); renderWorkshop(); }
+  else if (w==='del'){ const gone = config.units.splice(wsSel,1)[0]; config.objectives.forEach(o => { if (o.type==='army' && o.unit===gone.id) o.unit = config.units[0].id; }); wsSel = Math.max(0, wsSel-1); saveConfig(); renderWorkshop(); }
+  else if (w==='oadd'){ config.objectives.push({title:'', type:'level', n:3, unit:''}); saveConfig(); renderWorkshop(); }
+  else if (w==='odel'){ config.objectives.splice(+b.dataset.i,1); saveConfig(); renderWorkshop(); }
+  else if (w==='copy'){
+    const ta = modal.querySelector('#w-export'); const msg = modal.querySelector('#w-copied');
+    const fallback = () => { ta.focus(); ta.select(); msg.textContent = 'Selected. Press Ctrl+C (or Copy) to copy.'; };
+    try { navigator.clipboard.writeText(ta.value).then(() => { msg.textContent = 'Copied.'; }, fallback); } catch(err){ fallback(); }
+  }
+  else if (w==='import'){
+    const msg = modal.querySelector('#w-msg');
+    try { const c = JSON.parse(modal.querySelector('#w-import').value); if (!c || !Array.isArray(c.units)) throw new Error('no units'); config = normalizeConfig(c); saveConfig(); wsSel = 0; renderWorkshop(); modal.querySelector('#w-msg').textContent = 'Loaded. Start a new game to play with these rules.'; }
+    catch(err){ msg.className = 'err'; msg.textContent = 'That code couldn’t be read. Paste the full text you copied from the Workshop.'; }
+  }
+  else if (w==='reset'){ if (!wsResetArm){ wsResetArm = true; renderWorkshop(); } else { config = clone(DEFAULT_CONFIG); saveConfig(); wsSel = 0; wsResetArm = false; renderWorkshop(); } }
+});
+$('#bTech').onclick = () => G && showSky();
+$('#bGoals').onclick = () => G && showGoals();
+$('#bWork').onclick = showWorkshop;
+$('#bNew').onclick = showNewGame;
+$('#endTurn').onclick = endTurn;
+
+/* ---------- research constellation ---------- */
+const SKY_POS = {
+  foraging:[0,.94], hunting:[-.8,.68], fishing:[-.38,.6], climbing:[.05,.54], riding:[.43,.62], herbalism:[.82,.72],
+  archery:[-.9,.36], sailing:[-.5,.28], masonry:[-.03,.25], trade:[.46,.33], farming:[.86,.44], smithing:[.14,.02],
+};
+const sky = {open:false, focus:null, grow:{}, burst:null, pts:{}, bg:[], img:null, sprites:null, shift:0, shiftT:0, W:0, H:0, dpr:1, down:null};
+const smoothstep = (a,b,x) => { const t = clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); };
+function starSprite(lit){
+  const S = 128, c = document.createElement('canvas'); c.width = c.height = S;
+  const cx2 = c.getContext('2d'), im = cx2.createImageData(S,S);
+  const tint = lit ? [1,.78,.45] : [.55,.72,1], len = .85;
+  for (let j=0;j<S;j++) for (let i=0;i<S;i++){
+    const x = (i+.5)/S-.5, y = (j+.5)/S-.5, r2 = (x*x+y*y)*4;
+    const core = Math.exp(-r2/.003), halo = Math.pow(1+r2/.01,-2), wide = Math.pow(1+r2/.06,-1.5)*.2;
+    const qx = Math.abs(x)*2, qy = Math.abs(y)*2;
+    const spikes = Math.exp(-qy*qy/.0015)*Math.pow(Math.max(0,1-qx/(len*.45)),2.5) + Math.exp(-qx*qx/.0015)*Math.pow(Math.max(0,1-qy/len),2.5);
+    const dx = Math.abs(x+y)*1.414, dy = Math.abs(x-y)*1.414;
+    const diag = (Math.exp(-dy*dy/.0012)*Math.pow(Math.max(0,1-dx/(len*.35)),3) + Math.exp(-dx*dx/.0012)*Math.pow(Math.max(0,1-dy/(len*.35)),3))*.3;
+    const k = (1-smoothstep(.5,1,r2)) * (lit ? 1 : .55);
+    const col = [0,1,2].map(ch => (core*2 + (tint[ch]*.65+.35)*halo*2 + tint[ch]*wide*2.5 + (tint[ch]*.5+.5)*(spikes+diag)*.9) * k);
+    const a = Math.min(1, Math.max(...col)), o = (i+j*S)*4;
+    if (a > .003){ im.data[o]=Math.min(255,col[0]/a*255); im.data[o+1]=Math.min(255,col[1]/a*255); im.data[o+2]=Math.min(255,col[2]/a*255); im.data[o+3]=a*255; }
+  }
+  cx2.putImageData(im,0,0); return c;
+}
+function layoutSky(){
+  const c = $('#skyCv'); sky.dpr = Math.min(2, devicePixelRatio||1); sky.W = c.clientWidth; sky.H = c.clientHeight;
+  c.width = sky.W*sky.dpr; c.height = sky.H*sky.dpr;
+  const top = 150, bottom = sky.H - 90, hw = Math.min(sky.W/2 - 46, (bottom-top)*.55);
+  for (const id in SKY_POS){ const [x,y] = SKY_POS[id]; sky.pts[id] = [sky.W/2 + x*hw, top + y*(bottom-top)]; }
+  sky.bg = Array.from({length:150}, () => ({x:Math.random()*sky.W, y:Math.random()*sky.H, r:Math.random()*1.1+.3, a:Math.random()*.6+.15, s:Math.random()*2+.5, seed:Math.random()}));
+  const p = me();
+  $('#skyLabels').innerHTML = Object.keys(TECHS).map(id => `<div class="lab" data-lab="${id}"><div class="label${id==='foraging'?' root':''}${p.techs.includes(id)?' done':''}${sky.focus===id?' focus':''}">${TECHS[id].name}</div></div>`).join('');
+}
+function showSky(){
+  if (!G) return;
+  closeModal(); sky.open = true; sky.focus = null; sky.shift = sky.shiftT = 0; sky.burst = null;
+  $('#sky').hidden = false;
+  if (!sky.sprites) sky.sprites = {lit:starSprite(true), dim:starSprite(false)};
+  if (!sky.img){ sky.img = new Image(); sky.img.src = 'sky.webp'; }
+  layoutSky(); renderSkySheet(); requestAnimationFrame(skyFrame);
+}
+function closeSky(){ sky.open = false; $('#sky').hidden = true; $('#skySheet').classList.remove('open'); refresh(); }
+function skyFocus(id){
+  sky.focus = id;
+  document.querySelectorAll('#skyLabels .label').forEach(l => l.classList.toggle('focus', l.parentNode.dataset.lab===id));
+  renderSkySheet();
+  const sh = $('#skySheet');
+  sky.shiftT = id ? Math.max(0, sky.pts[id][1] - (sky.H - sh.offsetHeight - 80)) : 0;
+}
+function renderSkySheet(){
+  const p = me(), N = Object.keys(TECHS).length, el = $('#skySheet');
+  $('#skyStats').textContent = `★ ${p.stars}  ·  ${p.techs.length} of ${N} known`;
+  $('#skyBar').style.width = (p.techs.length/N*100) + '%';
+  $('#skyHint').style.opacity = sky.focus ? 0 : 1;
+  const id = sky.focus;
+  if (!id){ el.classList.remove('open'); return; }
+  const T = TECHS[id], owned = p.techs.includes(id), av = techAvailable(p,id), cost = techCost(p,id);
+  const unlocks = [...G.rules.units.filter(d => d.tech===id).map(d => d.name), ...Object.values(HARV).filter(h => h.tech===id).map(h => h.label.toLowerCase()), ...(id==='farming' ? ['build a farm'] : [])];
+  let act;
+  if (owned) act = `<div class="blocked">Your tribe knows this</div>`;
+  else if (!av) act = `<div class="blocked">Learn ${TECHS[T.req].name} first</div>`;
+  else act = `<div class="status">Costs ${cost}★ · you have ${p.stars}★</div><button class="primary" data-sky="buy" ${p.stars<cost?'disabled':''}>Research</button>${p.stars<cost ? `<div class="hint">${cost-p.stars} more star${cost-p.stars>1?'s':''} needed</div>` : ''}`;
+  el.innerHTML = `<button class="close" data-sky="close" aria-label="Close">×</button>
+    <div class="goal">${id==='foraging' ? 'The first star' : `Tier ${T.tier} · grows from ${TECHS[T.req].name}`}</div>
+    <h2>${T.name}</h2>
+    <div class="end">${T.desc}${unlocks.length ? ` Unlocks: ${esc(unlocks.join(', '))}.` : ''}</div>
+    ${owned ? '<div class="status"></div>' : ''}${act}`;
+  el.classList.add('open');
+}
+$('#skySheet').addEventListener('click', e => {
+  const b = e.target.closest('[data-sky]'); if (!b) return;
+  if (b.dataset.sky==='close'){ skyFocus(null); return; }
+  const p = me(), id = sky.focus;
+  if (b.dataset.sky==='buy' && id && techAvailable(p,id) && p.stars >= techCost(p,id) && !G.over){
+    p.stars -= techCost(p,id); p.techs.push(id);
+    const t = performance.now()/1000; sky.grow[id] = t; sky.burst = {id, t:t+.3};
+    const lab = document.querySelector(`[data-lab="${id}"] .label`); if (lab) lab.classList.add('done');
+    renderSkySheet(); afterAction();
+  }
+});
+$('#skyBack').onclick = closeSky;
+$('#skyCv').addEventListener('pointerdown', e => { sky.down = {x:e.clientX, y:e.clientY}; });
+$('#skyCv').addEventListener('pointerup', e => {
+  if (!sky.down || Math.hypot(e.clientX-sky.down.x, e.clientY-sky.down.y) > 10) return; sky.down = null;
+  const r = $('#skyCv').getBoundingClientRect(); const mx = e.clientX-r.left, my = e.clientY-r.top + sky.shift;
+  let best = null, bd = 44;
+  for (const id in sky.pts){ const d = Math.hypot(sky.pts[id][0]-mx, sky.pts[id][1]-my); if (d < bd){ bd = d; best = id; } }
+  skyFocus(best === sky.focus ? null : best);
+});
+addEventListener('resize', () => { if (sky.open){ layoutSky(); skyFocus(sky.focus); } });
+function skyFrame(nowMs){
+  if (!sky.open) return;
+  requestAnimationFrame(skyFrame);
+  const c = $('#skyCv'), x = c.getContext('2d'), t = nowMs/1000, p = me(), W = sky.W, H = sky.H;
+  sky.shift += (sky.shiftT - sky.shift) * (REDUCED ? 1 : .12);
+  x.setTransform(sky.dpr,0,0,sky.dpr,0,0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
+  x.fillStyle = '#04050a'; x.fillRect(0,0,W,H);
+  if (sky.img && sky.img.complete && sky.img.naturalWidth){
+    const im = sky.img, s = Math.max(W/im.naturalWidth, H/im.naturalHeight)*1.08, dw = im.naturalWidth*s, dh = im.naturalHeight*s;
+    const drift = REDUCED ? 0 : Math.sin(t*.05)*8;
+    x.globalAlpha = .85; x.drawImage(im, (W-dw)/2 + drift, (H-dh)/2 - sky.shift*.3, dw, dh); x.globalAlpha = 1;
+  }
+  const v = x.createRadialGradient(W/2,H*.45,Math.min(W,H)*.2,W/2,H*.45,Math.max(W,H)*.8); v.addColorStop(0,'rgba(4,5,10,0)'); v.addColorStop(1,'rgba(4,5,10,.85)');
+  x.fillStyle = v; x.fillRect(0,0,W,H);
+  x.globalCompositeOperation = 'lighter';
+  for (const s of sky.bg){ x.globalAlpha = s.a*(.6+.4*Math.sin(t*s.s+s.seed*30)); x.fillStyle = '#dfe6ff'; x.beginPath(); x.arc(s.x, s.y - sky.shift*.5, s.r, 0, 6.283); x.fill(); }
+  const P = id => [sky.pts[id][0], sky.pts[id][1] - sky.shift];
+  const ignite = id => sky.grow[id] !== undefined ? sky.grow[id] + .3 : -1e9;
+  // links: faint underneath, warm and growing when both ends are lit
+  x.lineCap = 'round';
+  for (const id in TECHS){
+    const rq = TECHS[id].req; if (!rq) continue; const a = P(rq), b = P(id);
+    x.globalAlpha = .07; x.strokeStyle = '#9aa8cc'; x.lineWidth = 6; x.beginPath(); x.moveTo(a[0],a[1]); x.lineTo(b[0],b[1]); x.stroke();
+    x.globalAlpha = .3; x.lineWidth = 1; x.stroke();
+    if (p.techs.includes(id) && p.techs.includes(rq)){
+      const g = sky.grow[id] !== undefined ? clamp((t - sky.grow[id])/.3, 0, 1) : 1;
+      const ex = a[0]+(b[0]-a[0])*g, ey = a[1]+(b[1]-a[1])*g;
+      x.strokeStyle = '#fff0d1';
+      x.globalAlpha = .14; x.lineWidth = 9; x.beginPath(); x.moveTo(a[0],a[1]); x.lineTo(ex,ey); x.stroke();
+      x.globalAlpha = .65; x.lineWidth = 1.6; x.stroke();
+      if (g < 1){ x.globalAlpha = 1; x.fillStyle = '#fff6e2'; x.beginPath(); x.arc(ex,ey,3,0,6.283); x.fill(); }
+    }
+  }
+  // stars
+  const sc = .8 + .2*Math.sin(t*3.7)*Math.sin(t*2.3+1.7);
+  let i = 0;
+  for (const id in TECHS){
+    const [px,py] = P(id), seed = (i++*.618)%1, owned = p.techs.includes(id);
+    const since = t - ignite(id), l = owned ? clamp(since/.2, 0, 1) : 0;
+    const flash = owned && sky.grow[id] !== undefined ? 2.2*Math.exp(-(((since-.1)/.13)**2)) : 0;
+    const focus = sky.focus === id ? 1 : 0;
+    const ready = !owned && techAvailable(p,id) && p.stars >= techCost(p,id);
+    const tw = .85 + .15*Math.sin(t*2.2 + seed*30);
+    const base = id==='foraging' ? .7 : TECHS[id].tier===3 ? .8 : .6;
+    const size = 150*base*(.6+.4*l)*(1+.7*flash)*(1+focus*(.7+.1*Math.sin(t*2.5)))*(ready ? 1+.08*Math.sin(t*3) : 1);
+    const bright = clamp(sc*tw*(1+1.6*flash)*(1+.6*focus), 0, 1.6);
+    for (const [spr, w] of [[sky.sprites.dim, 1-l], [sky.sprites.lit, l]]){
+      if (w <= 0) continue;
+      x.globalAlpha = Math.min(1, bright*w);
+      x.drawImage(spr, px-size/2, py-size/2, size, size);
+      if (bright*w > 1){ x.globalAlpha = bright*w-1; x.drawImage(spr, px-size/2, py-size/2, size, size); }
+    }
+  }
+  // burst of sparks on research
+  if (sky.burst && !REDUCED){
+    const age = t - sky.burst.t;
+    if (age > 1.2) sky.burst = null;
+    else if (age >= 0){
+      const [cx,cy] = P(sky.burst.id), k = 1-Math.exp(-age*3);
+      if (!sky.burst.sp) sky.burst.sp = Array.from({length:32}, (_,j) => ({a:j/32*6.283+Math.random()*.3, v:(.2+Math.random()*.45)*110}));
+      x.fillStyle = '#ffd98c';
+      for (const s of sky.burst.sp){ x.globalAlpha = clamp(1-age/1.1,0,1); x.beginPath(); x.arc(cx+Math.cos(s.a)*s.v*k, cy+Math.sin(s.a)*s.v*k, 2.2*(1-.5*k), 0, 6.283); x.fill(); }
+    }
+  }
+  x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+  document.querySelectorAll('#skyLabels .lab').forEach(el => { const [px,py] = P(el.dataset.lab); el.style.transform = `translate(${px}px,${py}px)`; });
+}
+
+/* ---------- save ---------- */
+const SAVE_KEY = 'cairn-crown-save-v1';
+function saveGame(){ try { if (G) localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch(e){} }
+
+/* ---------- rendering ---------- */
+const cv = $('#map'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize(){ DPR = Math.min(2, devicePixelRatio || 1); W = cv.clientWidth; H = cv.clientHeight; cv.width = W*DPR; cv.height = H*DPR; }
+addEventListener('resize', resize); resize();
+const proj = (x,y) => [(x-y)*TW/2, (x+y)*TH/2];
+function centerOn(x,y){ const [px,py] = proj(x,y); cam.x = W/2 - px*cam.z; cam.y = H/2 - py*cam.z + 20; }
+function poly(pts, fill, stroke, lw){
+  ctx.beginPath(); ctx.moveTo(pts[0],pts[1]); for (let i=2;i<pts.length;i+=2) ctx.lineTo(pts[i],pts[i+1]); ctx.closePath();
+  if (fill){ ctx.fillStyle = fill; ctx.fill(); } if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = lw||1; ctx.stroke(); }
+}
+function circle(x,y,r,fill){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle = fill; ctx.fill(); }
+const diamond = (cx,cy,s=1) => { const a=TW/2*s, b=TH/2*s; return [cx,cy-b, cx+a,cy, cx,cy+b, cx-a,cy]; };
+function box(bx,by,a,hh,wl,wr,rl,rr,roofH){
+  const b = a/2;
+  poly([bx-a,by-hh, bx,by-hh+b, bx,by+b, bx-a,by], wl);
+  poly([bx+a,by-hh, bx,by-hh+b, bx,by+b, bx+a,by], wr);
+  if (roofH){ const ay = by-hh-roofH; poly([bx,ay, bx-a,by-hh, bx,by-hh+b], rl); poly([bx,ay, bx,by-hh+b, bx+a,by-hh], rr); }
+  else poly([bx,by-hh-b, bx+a,by-hh, bx,by-hh+b, bx-a,by-hh], rl);
+}
+function tree(x,y,s){
+  poly([x-1.2,y, x+1.2,y, x+1.2,y-5*s, x-1.2,y-5*s], '#6b4a2e');
+  poly([x,y-22*s, x-8*s,y-4*s, x,y-2*s], '#45a065'); poly([x,y-22*s, x,y-2*s, x+8*s,y-4*s], '#2e7049');
+}
+const TCOL = {plains:['#a2d06e','#7aa94f','#5d8a3a'], forest:['#8fc265','#6c9b47','#507c33'], mountain:['#a9b872','#86924f','#67733a']};
+function drawTile(x,y,t,now){
+  const [cx,cy] = proj(x,y);
+  if (!explored(x,y)){
+    poly(diamond(cx,cy+2), '#0f2c39');
+    circle(cx-8,cy-1,8,'rgba(190,220,230,0.05)'); circle(cx+9,cy+2,7,'rgba(190,220,230,0.04)');
+    return;
+  }
+  if (t.t==='water'){
+    const sh = isShallow(x,y);
+    poly(diamond(cx,cy+3), sh ? '#4fa9c3' : '#2f7d9b');
+    if (sh){ const w = REDUCED ? 0 : Math.sin(now/700 + x + y)*2; ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(cx-10+w,cy+2); ctx.quadraticCurveTo(cx-4+w,cy-1,cx+2+w,cy+2); ctx.stroke(); }
+    if (t.res==='fish'){ ctx.fillStyle='#e9f6f8'; ctx.beginPath(); ctx.ellipse(cx+3,cy+4,6,2.6,0,0,Math.PI*2); ctx.fill(); poly([cx-3,cy+4, cx-8,cy+1, cx-8,cy+7], '#e9f6f8'); circle(cx+6,cy+3.4,0.9,'#1d4c60'); }
+    drawBorders(x,y,t,cx,cy+3);
+    return;
+  }
+  const top = cy - LAND_H, c = TCOL[t.t];
+  poly([cx-TW/2,top, cx,top+TH/2, cx,cy+TH/2, cx-TW/2,cy], c[1]);
+  poly([cx+TW/2,top, cx,top+TH/2, cx,cy+TH/2, cx+TW/2,cy], c[2]);
+  poly(diamond(cx,top), c[0]);
+  const own = terrOwner(t);
+  if (own>=0) poly(diamond(cx,top), rgba(G.players[own].color,0.16));
+  drawBorders(x,y,t,cx,top);
+  if (t.imp==='farm'){ poly(diamond(cx,top,0.66), '#e6c86c'); ctx.strokeStyle='#c7a443'; ctx.lineWidth=1.4; for (let k=-2;k<=2;k++){ ctx.beginPath(); ctx.moveTo(cx-10+k*5,top-5+k*2.5+ (k<0?0:0)); ctx.lineTo(cx+0+k*5,top+0+k*2.5); ctx.stroke(); } }
+  if (t.t==='forest'){ tree(cx-12,top+1,0.9); tree(cx+11,top,1); if (t.res!=='game') tree(cx,top+8,1.05); else tree(cx-1,top+8,0.8); }
+  if (t.t==='mountain'){
+    poly([cx+2,top-1, cx+14,top-17, cx+26,top-1], '#a39b8b');
+    poly([cx-24,top+3, cx-6,top-27, cx+2,top+8], '#cfc8b8'); poly([cx-6,top-27, cx+22,top+2, cx+2,top+8], '#958d7e');
+    poly([cx-6,top-27, cx-11,top-17, cx-7,top-19, cx-3,top-15, cx+3,top-19], '#ffffff');
+  }
+  if (t.res==='fruit'){ circle(cx+9,top+1,6.5,'#3c8f58'); circle(cx+5,top-1,4.5,'#4fa86b'); circle(cx+6,top+1,1.6,'#ff6f91'); circle(cx+11,top-1,1.6,'#ff6f91'); circle(cx+10,top+4,1.6,'#ff6f91'); }
+  if (t.res==='game'){ const px=cx+11, py=top+10; ctx.strokeStyle='#5a3d22'; ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(px-3,py-3); ctx.lineTo(px-3,py+1); ctx.moveTo(px+3,py-3); ctx.lineTo(px+3,py+1); ctx.moveTo(px+6,py-10); ctx.lineTo(px+4,py-15); ctx.moveTo(px+6,py-10); ctx.lineTo(px+9,py-14); ctx.stroke(); ctx.fillStyle='#b97c45'; ctx.beginPath(); ctx.ellipse(px,py-5,6,3.4,0,0,Math.PI*2); ctx.fill(); circle(px+6,py-9,2.6,'#b97c45'); }
+  if (t.res==='ore'){ poly([cx-16,top+8, cx-13,top-2, cx-10,top+8], '#8ff0e6'); poly([cx-12,top+9, cx-8,top-5, cx-5,top+9], '#3fbfb3'); poly([cx-8,top+9, cx-5,top+1, cx-2,top+9], '#8ff0e6'); }
+  if (t.imp==='mine'){ ctx.fillStyle='#3a2f28'; ctx.beginPath(); ctx.moveTo(cx+4,top+9); ctx.lineTo(cx+4,top+3); ctx.quadraticCurveTo(cx+9,top-3,cx+14,top+3); ctx.lineTo(cx+14,top+9); ctx.fill(); ctx.strokeStyle='#8a6a3f'; ctx.lineWidth=1.5; ctx.stroke(); }
+  if (t.village){ box(cx-9,top+3,6,7,'#ead7ad','#cdb486','#c4733f','#9a552c',8); box(cx+9,top+5,6,6,'#ead7ad','#cdb486','#c4733f','#9a552c',7); }
+  if (t.ruin){ box(cx-7,top+2,3.5,12,'#b6b3a8','#8e8b80','#cfccc2','#cfccc2',0); box(cx+6,top+4,3.5,6,'#b6b3a8','#8e8b80','#cfccc2','#cfccc2',0); poly([cx+1,top+9, cx+8,top+7, cx+12,top+10, cx+4,top+12], '#a6a397'); }
+  if (t.shrine){
+    const holder = unitAt(x,y);
+    if (holder) poly(diamond(cx,top,0.8), null, G.players[holder.owner].color, 2.5);
+    box(cx,top+3,13,3,'#c9d3d8','#9fb0b8','#e4ebee','#e4ebee',0);
+    box(cx,top,5,24,'#dfe8ec','#a5b6bf','#f1f5f6','#cbd6db',9);
+    const g = REDUCED ? .7 : .55 + Math.sin(now/500)*.25; circle(cx,top-35,4.5,`rgba(255,197,61,${g})`);
+  }
+}
+function drawBorders(x,y,t,cx,top){
+  const own = terrOwner(t); if (own<0) return;
+  const col = G.players[own].color, a=TW/2*0.96, b=TH/2*0.96;
+  const N=[cx,top-b], E=[cx+a,top], S=[cx,top+b], Wp=[cx-a,top];
+  const edges = [[x,y-1,N,E],[x+1,y,E,S],[x,y+1,S,Wp],[x-1,y,Wp,N]];
+  ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.lineCap='round';
+  for (const [nx,ny,p1,p2] of edges){
+    const o = inB(nx,ny) ? terrOwner(tileAt(nx,ny)) : -1;
+    if (o!==own){ ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.stroke(); }
+  }
+}
+function tileTop(x,y){ const [cx,cy] = proj(x,y); const t = tileAt(Math.round(x),Math.round(y)); return [cx, t && t.t==='water' ? cy+3 : cy-LAND_H]; }
+function drawCity(c){
+  const [cx,top] = tileTop(c.x,c.y); const col = G.players[c.owner].color;
+  poly(diamond(cx,top,0.8), '#ddd3bb');
+  if (c.walls) poly(diamond(cx,top,0.9), null, '#7f848c', 3.5);
+  const spots = [[-12,-3],[12,-3],[0,-9],[-7,4],[7,4],[0,10]].slice(0, Math.min(c.level+1,6)).map(s => [...s,'h']);
+  if (c.capital) spots.push([0,0,'t']);
+  spots.sort((a,b) => a[1]-b[1]);
+  for (const [ox,oy,k] of spots){
+    if (k==='t'){ box(cx,top+2,7,20,'#f4ecdc','#d3c6ab',col,shade(col,.7),10); ctx.strokeStyle='#5a4a3a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(cx,top-28); ctx.lineTo(cx,top-40); ctx.stroke(); poly([cx,top-40, cx+9,top-37, cx,top-34], col); }
+    else box(cx+ox,top+oy,5.5,7,'#f4ecdc','#d3c6ab',col,shade(col,.7),6);
+  }
+}
+function drawCityLabel(c){
+  const [cx,top] = tileTop(c.x,c.y); const col = G.players[c.owner].color;
+  ctx.font = '800 9px Nunito, system-ui, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const label = c.name; const w = ctx.measureText(label).width + 22; const y = top - (c.capital ? 54 : 34);
+  ctx.fillStyle = 'rgba(10,30,40,0.85)'; ctx.beginPath(); ctx.roundRect(cx-w/2, y-7, w, 14, 7); ctx.fill();
+  circle(cx-w/2+7, y, 5, col); ctx.fillStyle='#10303e'; ctx.font='800 7px Nunito, system-ui, sans-serif'; ctx.fillText(c.level, cx-w/2+7, y+0.5);
+  ctx.fillStyle='#fff'; ctx.font='800 9px Nunito, system-ui, sans-serif'; ctx.fillText(label, cx+5, y+0.5);
+  const n = c.level+1, pw = n*6; for (let i=0;i<n;i++){ ctx.beginPath(); ctx.arc(cx-pw/2+3+i*6, y+11, 2.2, 0, Math.PI*2); ctx.fillStyle = i<c.pop ? '#ffc53d' : 'rgba(10,30,40,0.75)'; ctx.fill(); ctx.strokeStyle='#ffc53d'; ctx.lineWidth=0.8; ctx.stroke(); }
+}
+function drawUnit(u, now){
+  const d = U(u), col = G.players[u.owner].color;
+  const [cx,cy] = proj(u.dx,u.dy); const t = tileAt(u.x,u.y);
+  const top = cy + (t.t==='water' ? 3 : -LAND_H) - (t.t==='water' ? 0 : 0);
+  const done = u.owner===0 && !G.over && !canMove(u) && !targets(u).length && !canCapture(u);
+  ctx.globalAlpha = done ? 0.62 : 1;
+  if (sel && sel.kind==='unit' && sel.id===u.id){ const p = REDUCED ? 0 : Math.sin(now/220)*1.5; ctx.strokeStyle='#ffc53d'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.ellipse(cx,top,14+p,7+p/2,0,0,Math.PI*2); ctx.stroke(); }
+  ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(cx,top,10,4.5,0,0,Math.PI*2); ctx.fill();
+  if (t.t==='water'){ poly([cx-13,top-2, cx+13,top-2, cx+9,top+4, cx-9,top+4], '#8a5a34'); }
+  poly([cx-8,top-1, cx,top+1, cx,top-17, cx-6,top-17], col);
+  poly([cx+8,top-1, cx,top+1, cx,top-17, cx+6,top-17], shade(col,.72));
+  circle(cx,top-22,5.5,'#f2cfa6'); poly([cx-6,top-23, cx+6,top-23, cx+4,top-27, cx-4,top-27], shade(col,.85));
+  circle(cx,top-37,8.5,'#ffffff'); ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,top-37,8.5,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle = shade(col,.6); ctx.font='800 10px Nunito, "Segoe UI Symbol", "Apple Color Emoji", system-ui, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(d.glyph, cx, top-36.5);
+  const hpTxt = String(u.hp); ctx.font='800 8px Nunito, system-ui, sans-serif'; const hw = ctx.measureText(hpTxt).width + 8;
+  ctx.fillStyle = u.hp < d.hp*.4 ? '#c8402f' : 'rgba(10,30,40,0.9)'; ctx.beginPath(); ctx.roundRect(cx+7, top-24, hw, 11, 5.5); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.fillText(hpTxt, cx+7+hw/2, top-18.3);
+  ctx.globalAlpha = 1;
+}
+function frame(now){
+  requestAnimationFrame(frame);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const g = ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.75); g.addColorStop(0,'#1d4c60'); g.addColorStop(1,'#0c2733');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  if (!G) return;
+  for (const u of G.units){ if (REDUCED){ u.dx=u.x; u.dy=u.y; } else { u.dx += (u.x-u.dx)*.22; u.dy += (u.y-u.dy)*.22; if (Math.abs(u.x-u.dx)<.01) u.dx=u.x; if (Math.abs(u.y-u.dy)<.01) u.dy=u.y; } }
+  ctx.setTransform(DPR*cam.z,0,0,DPR*cam.z,cam.x*DPR,cam.y*DPR);
+  const n = G.n;
+  for (let s=0; s<=2*(n-1); s++) for (let x=Math.max(0,s-n+1); x<=Math.min(s,n-1); x++){ const y=s-x; drawTile(x,y,tileAt(x,y),now); }
+  // highlights
+  if (sel && sel.kind==='tile' && inB(sel.x,sel.y)){ const [cx,top] = tileTop(sel.x,sel.y); poly(diamond(cx,top,0.92), null, '#ffc53d', 2.5); }
+  for (const i of selReach){ const x=i%n, y=i/n|0; const [cx,top] = tileTop(x,y); ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.beginPath(); ctx.ellipse(cx,top,5.5,2.8,0,0,Math.PI*2); ctx.fill(); }
+  for (const t of selTargets){ const [cx,top] = tileTop(t.x,t.y); poly(diamond(cx,top,0.9), 'rgba(255,90,70,0.22)', '#ff6a55', 2.5); }
+  // objects
+  const objs = [];
+  for (const c of G.cities) if (explored(c.x,c.y)) objs.push({d:c.x+c.y-.1, f:() => drawCity(c)});
+  for (const u of G.units) if (explored(u.x,u.y)) objs.push({d:u.dx+u.dy, f:() => drawUnit(u,now)});
+  objs.sort((a,b) => a.d-b.d).forEach(o => o.f());
+  for (const c of G.cities) if (explored(c.x,c.y)) drawCityLabel(c);
+  for (let i=FX.length-1;i>=0;i--){
+    const f = FX[i], age = (now - f.t0)/1000; if (age>1.4){ FX.splice(i,1); continue; }
+    if (!explored(f.x,f.y)) continue;
+    const [cx,top] = tileTop(f.x,f.y); ctx.globalAlpha = clamp(1.4-age,0,1);
+    ctx.font='800 12px Nunito, system-ui, sans-serif'; ctx.textAlign='center'; ctx.lineWidth=3; ctx.strokeStyle='rgba(10,30,40,0.9)';
+    ctx.strokeText(f.text, cx, top-48-age*18); ctx.fillStyle=f.color; ctx.fillText(f.text, cx, top-48-age*18); ctx.globalAlpha=1;
+  }
+}
+requestAnimationFrame(frame);
+
+/* ---------- input ---------- */
+function screenToTile(sx,sy){
+  const r = cv.getBoundingClientRect();
+  const wx = (sx - r.left - cam.x)/cam.z, wy = (sy - r.top - cam.y)/cam.z + 5;
+  const a = wx/(TW/2), b = wy/(TH/2);
+  return [Math.round((a+b)/2), Math.round((b-a)/2)];
+}
+const ptrs = new Map(); let drag = null, pinch = null;
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (ptrs.size===1) drag = {sx:e.clientX, sy:e.clientY, cx:cam.x, cy:cam.y, moved:false};
+  else if (ptrs.size===2){ const [a,b] = [...ptrs.values()]; pinch = {d:Math.hypot(a.x-b.x,a.y-b.y)||1, z:cam.z, mx:(a.x+b.x)/2, my:(a.y+b.y)/2, cx:cam.x, cy:cam.y}; if (drag) drag.moved = true; }
+});
+cv.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (pinch && ptrs.size>=2){ const [a,b] = [...ptrs.values()]; const z = clamp(pinch.z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d, .45, 2.4); cam.x = pinch.mx - (pinch.mx-pinch.cx)*z/pinch.z; cam.y = pinch.my - (pinch.my-pinch.cy)*z/pinch.z; cam.z = z; }
+  else if (drag){ const dx = e.clientX-drag.sx, dy = e.clientY-drag.sy; if (Math.abs(dx)+Math.abs(dy) > 7) drag.moved = true; if (drag.moved){ cam.x = drag.cx+dx; cam.y = drag.cy+dy; } }
+});
+function ptrEnd(e, cancel){
+  if (!ptrs.has(e.pointerId)) return; ptrs.delete(e.pointerId);
+  if (ptrs.size<2) pinch = null;
+  if (ptrs.size===0){ if (!cancel && drag && !drag.moved){ const [x,y] = screenToTile(e.clientX,e.clientY); tapTile(x,y); } drag = null; }
+  else if (ptrs.size===1){ const [p] = [...ptrs.values()]; drag = {sx:p.x, sy:p.y, cx:cam.x, cy:cam.y, moved:true}; }
+}
+cv.addEventListener('pointerup', e => ptrEnd(e,false));
+cv.addEventListener('pointercancel', e => ptrEnd(e,true));
+cv.addEventListener('wheel', e => {
+  e.preventDefault(); const r = cv.getBoundingClientRect(); const mx = e.clientX-r.left, my = e.clientY-r.top;
+  const z = clamp(cam.z * Math.exp(-e.deltaY*0.0015), .45, 2.4);
+  cam.x = mx - (mx-cam.x)*z/cam.z; cam.y = my - (my-cam.y)*z/cam.z; cam.z = z;
+}, {passive:false});
+
+/* ---------- boot ---------- */
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault(), {passive:false});
+function boot(){
+  cam.z = 0.85;
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e){}
+  if (saved && saved.tiles && saved.rules && !saved.over){
+    G = saved; sel = null;
+    for (const u of G.units){ u.dx = u.x; u.dy = u.y; }
+    const home = citiesOf(0)[0]; if (home) centerOn(home.x, home.y);
+    refresh(); toast(`Welcome back. Turn ${G.turn}.`);
+    if (G.pending.length) showLevelUp();
+    return;
+  }
+  startGame(); showIntro();
+}
+boot();
+})();
+</script>
+</body>
+</html>
