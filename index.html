@@ -947,8 +947,8 @@ $('#panel').addEventListener('click', e => {
   if (act==='new'){ showScreen('scrTribe'); return; }
   if (act==='work') return showWorkshop();
   if (G.over) return;
-  if (act==='capture'){ const u = G.units.find(x => x.id===sel.id); if (u && canCapture(u)) capture(u); }
-  else if (act==='heal'){ const u = G.units.find(x => x.id===sel.id); if (u) doHeal(u); }
+  if (act==='capture'){ const u = G.units.find(x => x.id===sel.id); if (u && canCapture(u)){ capture(u); sel = null; } }
+  else if (act==='heal'){ const u = G.units.find(x => x.id===sel.id); if (u){ doHeal(u); sel = null; } }
   else if (act==='tile'){ const u = G.units.find(x => x.id===sel.id); sel = {kind:'tile', x:u.x, y:u.y}; }
   else if (act==='unit'){ const u = unitAt(sel.x, sel.y); if (u) sel = {kind:'unit', id:u.id}; }
   else if (act==='train'){ const c = cityAt(sel.x, sel.y); const d = G.rules.units[+b.dataset.i]; if (c && d && !trainBlock(p,c,d)) train(p,c,d); }
@@ -965,8 +965,8 @@ function tapTile(x,y){
     const su = G.units.find(v => v.id===sel.id);
     if (su && su.owner===0){
       const tg = selTargets.find(t => t.x===x && t.y===y);
-      if (tg){ attack(su,tg); if (!G.units.includes(su)) sel = null; afterAction(); return; }
-      if (selReach.has(x + y*G.n)){ moveUnit(su,x,y); afterAction(); return; }
+      if (tg){ attack(su,tg); sel = null; afterAction(); return; }
+      if (selReach.has(x + y*G.n)){ moveUnit(su,x,y); if (!targets(su).length) sel = null; afterAction(); return; }
     }
     if (u && su && u.id===su.id){ sel = {kind:'tile',x,y}; refresh(); return; }
   }
